@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}System Logs — Admin{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Admin</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/admin"><span class="icon">🏠</span>Dashboard</a>
+      <a class="nav-item" href="/admin/live"><span class="icon">📡</span>Live Monitor</a>
+      <a class="nav-item" href="/admin/users"><span class="icon">👥</span>Users</a>
+      <a class="nav-item" href="/admin/exams"><span class="icon">📋</span>Exams</a>
+      <a class="nav-item" href="/admin/sessions"><span class="icon">📁</span>Sessions</a>
+      <a class="nav-item active" href="/admin/logs"><span class="icon">🗒️</span>Logs</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">Administrator</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+  <div class="main-area">
+    <div class="topbar"><div><h2>System Logs</h2><div class="breadcrumb">Last 500 actions</div></div></div>
+    <div class="page-content">
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+            <tbody>
+              {% for log in logs %}
+              <tr>
+                <td style="font-size:.72rem;color:var(--text3);white-space:nowrap;">{{ log.timestamp[:19] }}</td>
+                <td style="font-size:.8rem;color:var(--text1);">{{ log.user_name or '—' }}</td>
+                <td>
+                  <span style="padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:600;background:var(--bg4);color:var(--text2);">{{ log.action }}</span>
+                </td>
+                <td style="font-size:.75rem;color:var(--text3);">{{ log.details }}</td>
+                <td style="font-size:.72rem;color:var(--text3);">{{ log.ip }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

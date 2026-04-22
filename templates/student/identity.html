@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Identity Verification — ProctorVault</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#07090f;--bg1:#0d1117;--bg2:#141924;--bg3:#1c2333;--border:#2a3550;--border2:#364060;
+  --text0:#f0f4ff;--text1:#c8d3f0;--text2:#7b8db8;--text3:#4a5578;
+  --accent:#4f8ef7;--accent2:#2563eb;--green:#22d3a0;--red:#f05a5a;--amber:#f0a030;
+  --font:'DM Sans',sans-serif;--mono:'Space Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg0);color:var(--text1);min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px;}
+
+/* ── Progress steps ── */
+.steps{display:flex;align-items:center;gap:0;margin-bottom:28px;margin-top:8px;}
+.step{display:flex;align-items:center;gap:7px;font-size:.74rem;font-weight:600;}
+.sn{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700;flex-shrink:0;}
+.step.done .sn{background:var(--green);color:#0a1a10;}
+.step.active .sn{background:var(--accent2);color:#fff;}
+.step.pend .sn{background:var(--bg3);color:var(--text3);border:1px solid var(--border);}
+.step.done span,.step.active span{color:var(--text1);}
+.step.pend span{color:var(--text3);}
+.step-sep{width:32px;height:1px;background:var(--border);margin:0 4px;}
+
+/* ── Page header ── */
+.page-header{text-align:center;margin-bottom:24px;}
+.page-header .icon{font-size:2.4rem;margin-bottom:8px;}
+.page-header h1{font-family:var(--mono);font-size:1.25rem;color:var(--text0);margin-bottom:4px;}
+.page-header p{font-size:.82rem;color:var(--text3);}
+
+/* ── Main card ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  width:740px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;}
+
+/* ── Two-panel layout ── */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.panel{padding:20px;}
+.panel:first-child{border-right:1px solid var(--border);}
+.panel-title{font-size:.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;
+  letter-spacing:.09em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+
+/* ── Video / image box ── */
+.vid-box{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;
+  border:2px solid var(--border);}
+.vid-box video,.vid-box img,.vid-box canvas{
+  position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+/* Face oval guide */
+.face-guide{position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);
+  width:42%;padding-bottom:52%;border-radius:50%;
+  border:2px dashed rgba(79,142,247,.55);pointer-events:none;
+  animation:guidepulse 2s ease-in-out infinite;}
+@keyframes guidepulse{0%,100%{border-color:rgba(79,142,247,.35)}50%{border-color:rgba(79,142,247,.9)}}
+.vid-label{position:absolute;bottom:8px;left:10px;font-size:.62rem;color:rgba(255,255,255,.55);
+  background:rgba(0,0,0,.4);padding:2px 8px;border-radius:4px;}
+
+/* ── Result overlay on cam ── */
+.result-overlay{position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;}
+.result-overlay.show{display:flex;}
+.result-overlay.match{background:rgba(0,30,20,.82);}
+.result-overlay.mismatch{background:rgba(30,0,0,.82);}
+.result-icon{font-size:3rem;}
+.result-pct{font-family:var(--mono);font-size:1.6rem;font-weight:700;}
+.result-txt{font-size:.85rem;font-weight:600;}
+
+/* ── Ref photo (no photo placeholder) ── */
+.ref-no-photo{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:8px;color:var(--text3);}
+.ref-no-photo .icon{font-size:2.5rem;}
+.ref-no-photo p{font-size:.75rem;text-align:center;max-width:140px;}
+
+/* ── Action bar ── */
+.action-bar{padding:16px 20px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;
+  border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;
+  transition:all .15s;font-family:var(--font);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn-capture{background:var(--accent2);color:#fff;}
+.btn-capture:not(:disabled):hover{background:var(--accent);}
+.btn-retry{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.btn-retry:hover{color:var(--text0);}
+.btn-proceed{background:linear-gradient(135deg,#059669,var(--accent2));color:#fff;}
+.status-hint{font-size:.78rem;color:var(--text3);}
+.status-hint.ok{color:var(--green);}
+.status-hint.fail{color:var(--red);}
+
+/* ── Similarity meter ── */
+.sim-meter{padding:0 20px 14px;}
+.sim-label{display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:5px;}
+.sim-label span:first-child{color:var(--text2);}
+.sim-val{font-weight:700;}
+.sim-track{height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;}
+.sim-fill{height:100%;border-radius:4px;transition:width .6s ease,background .4s;}
+
+/* ── Alerts ── */
+.alert{padding:12px 16px;border-radius:10px;font-size:.83rem;margin:0 20px 14px;
+  display:flex;align-items:flex-start;gap:10px;}
+.alert-error{background:rgba(240,90,90,.1);color:var(--red);border:1px solid rgba(240,90,90,.25);}
+.alert-info{background:rgba(79,142,247,.1);color:var(--accent);border:1px solid rgba(79,142,247,.25);}
+.attempt-count{font-size:.72rem;color:var(--text3);margin-top:4px;}
+
+/* ── Rules ── */
+.rules{display:flex;flex-direction:column;gap:7px;padding:0 20px 16px;}
+.rule{display:flex;align-items:center;gap:9px;font-size:.79rem;color:var(--text2);
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 11px;}
+.rule .ri{font-size:.95rem;width:18px;text-align:center;flex-shrink:0;}
+
+/* ── Fail count warning ── */
+.fail-warning{background:rgba(240,160,48,.1);color:var(--amber);border:1px solid rgba(240,160,48,.25);
+  padding:8px 14px;border-radius:8px;font-size:.78rem;margin:0 20px 12px;
+  display:flex;align-items:center;gap:8px;}
+
+@media(max-width:640px){
+  .panels{grid-template-columns:1fr;}
+  .panel:first-child{border-right:none;border-bottom:1px solid var(--border);}
+}
+</style>
+</head>
+<body>
+
+<!-- Progress steps -->
+<div class="steps">
+  <div class="step done"><div class="sn">✓</div><span>Join</span></div>
+  <div class="step-sep"></div>
+  <div class="step active"><div class="sn">2</div><span>Identity</span></div>
+  <div class="step-sep"></div>
+  <div class="step pend"><div class="sn">3</div><span>System Check</span></div>
+  <div class="step-sep"></div>
+  <div class="step pend"><div class="sn">4</div><span>Exam</span></div>
+</div>
+
+<!-- Page header -->
+<div class="page-header">
+  <div class="icon">🪪</div>
+  <h1>Identity Verification</h1>
+  <p>{{ session.title }} — Capture your face to confirm your identity</p>
+</div>
+
+<div class="card">
+
+  {% if error %}
+  <div class="alert alert-error" style="margin:16px 20px 0;">⚠️ {{ error }}</div>
+  {% endif %}
+
+  {% if result and not result.match %}
+  {% set fail_pct = (result.sim * 100)|int %}
+  <div class="fail-warning">
+    ⚠️ Match score was {{ fail_pct }}% — need {{ (result.threshold * 100)|int }}%.
+    Try better lighting or move closer to the camera.
+  </div>
+  {% endif %}
+
+  <!-- Side-by-side panels -->
+  <div class="panels">
+
+    <!-- Left: live webcam -->
+    <div class="panel">
+      <div class="panel-title">📷 Your Live Camera</div>
+      <div class="vid-box" id="vid-box">
+        <video id="vid" autoplay muted playsinline></video>
+        <canvas id="snap-canvas" style="display:none;z-index:2;"></canvas>
+        <div class="face-guide" id="face-guide"></div>
+        <span class="vid-label" id="vid-label">Starting camera…</span>
+        <!-- Result overlay -->
+        <div class="result-overlay" id="result-ov">
+          <div class="result-icon" id="result-icon"></div>
+          <div class="result-pct" id="result-pct"></div>
+          <div class="result-txt" id="result-txt"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: reference photo from roster -->
+    <div class="panel">
+      <div class="panel-title">🗂️ Registered Photo</div>
+      <div class="vid-box">
+        {% if ref_photo_url %}
+        <img src="{{ ref_photo_url }}" alt="Your registered photo" style="object-fit:cover;">
+        <span class="vid-label">Teacher's reference</span>
+        {% else %}
+        <div class="ref-no-photo">
+          <div class="icon">🖼️</div>
+          <p>No reference photo registered.<br>Contact your teacher.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Similarity meter (shown after capture) -->
+  <div class="sim-meter" id="sim-meter" style="display:none;padding-top:14px;">
+    <div class="sim-label">
+      <span>Identity Match Score</span>
+      <span class="sim-val" id="sim-val-txt">—</span>
+    </div>
+    <div class="sim-track"><div class="sim-fill" id="sim-fill" style="width:0%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--text3);margin-top:3px;">
+      <span>0%</span>
+      <span>Threshold: {{ (session.face_verify_thresh * 100)|int if session.face_verify_thresh else 72 }}%</span>
+      <span>100%</span>
+    </div>
+  </div>
+
+  <!-- Rules / instructions -->
+  <div class="rules" id="rules-section">
+    <div class="rule"><span class="ri">💡</span> Ensure good lighting — face should be evenly lit</div>
+    <div class="rule"><span class="ri">👀</span> Look directly at the camera, head upright</div>
+    <div class="rule"><span class="ri">🚫</span> Remove glasses, hats, or anything covering your face</div>
+    <div class="rule"><span class="ri">📏</span> Keep your face within the oval guide on screen</div>
+  </div>
+
+  <!-- Action bar -->
+  <div class="action-bar">
+    <span class="status-hint" id="status-hint">Ready to capture…</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-retry" id="btn-retry" onclick="resetCapture()" style="display:none;">↩ Retake</button>
+      <button class="btn btn-capture" id="btn-capture" onclick="captureAndVerify()" disabled>
+        📸 Capture &amp; Verify
+      </button>
+      <button class="btn btn-proceed" id="btn-proceed" style="display:none;">
+        Continue to Exam →
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden POST form for verified submission -->
+<form method="POST" id="verify-form" style="display:none;">
+  <input type="hidden" name="photo_b64" id="form-photo-b64">
+</form>
+
+<script>
+const SESSION_ID = "{{ session.id }}";
+const THRESHOLD  = {{ (session.face_verify_thresh)|float if session.face_verify_thresh else 0.72 }};
+let stream = null, capturing = false, verified = false;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {width:640, height:480, facingMode:'user'}, audio:false
+    });
+    const vid = document.getElementById('vid');
+    vid.srcObject = stream;
+    await vid.play();
+    document.getElementById('vid-label').textContent = '● Live';
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('status-hint').textContent = 'Camera ready. Align your face in the oval.';
+  } catch(e) {
+    document.getElementById('vid-label').textContent = 'Camera error';
+    document.getElementById('status-hint').textContent = 'Camera access denied — check browser permissions.';
+    document.getElementById('status-hint').className = 'status-hint fail';
+  }
+}
+
+async function captureAndVerify() {
+  if (capturing) return;
+  capturing = true;
+  document.getElementById('btn-capture').disabled = true;
+  document.getElementById('status-hint').textContent = 'Verifying…';
+  document.getElementById('face-guide').style.display = 'none';
+  document.getElementById('rules-section').style.display = 'none';
+
+  const vid    = document.getElementById('vid');
+  const canvas = document.getElementById('snap-canvas');
+  canvas.width  = 640; canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(vid, 0, 0, 640, 480);
+  canvas.style.display = 'block';
+
+  const b64 = canvas.toDataURL('image/jpeg', 0.88);
+
+  // Send to server for verification
+  try {
+    const res  = await fetch(window.location.href, {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'photo_b64=' + encodeURIComponent(b64)
+    });
+    const html = await res.text();
+
+    // Parse the result JSON from a meta tag we'll inject
+    // Instead: re-parse the page for the result values
+    const parser  = new DOMParser();
+    const doc     = parser.parseFromString(html, 'text/html');
+    const simMeterEl = doc.getElementById('sim-meter');
+
+    // Check if page has an error alert (mismatch) or success redirect
+    const errorEl   = doc.querySelector('.alert-error');
+    const failWarn  = doc.querySelector('.fail-warning');
+
+    // Extract sim value from response page's sim meter if present
+    // The server actually redirects on success, so check if we got redirected
+    if (res.redirected || res.url.includes('/syscheck/')) {
+      // Success — server redirected
+      showResult(true, 1.0);
+      setTimeout(() => window.location = res.url, 1200);
+      return;
+    }
+
+    // Still on identity page — check for error/fail
+    if (errorEl || failWarn) {
+      // Try to extract sim from fail-warning text
+      let sim = 0;
+      if (failWarn) {
+        const m = failWarn.textContent.match(/(\d+)%/);
+        if (m) sim = parseInt(m[1]) / 100;
+      }
+      showResult(false, sim);
+      document.getElementById('btn-retry').style.display = '';
+      document.getElementById('status-hint').textContent = 'Verification failed. Try again.';
+      document.getElementById('status-hint').className = 'status-hint fail';
+    } else {
+      // Assume success if no error and no redirect (can happen with 200 on success page)
+      showResult(true, 1.0);
+      setTimeout(() => window.location = '/syscheck/'+SESSION_ID, 1200);
+    }
+
+  } catch(e) {
+    document.getElementById('status-hint').textContent = 'Network error. Try again.';
+    document.getElementById('status-hint').className = 'status-hint fail';
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('face-guide').style.display = '';
+  }
+  capturing = false;
+}
+
+function showResult(match, sim) {
+  const ov  = document.getElementById('result-ov');
+  const pct = Math.round(sim * 100);
+
+  // Similarity meter
+  const meter = document.getElementById('sim-meter');
+  meter.style.display = 'block';
+  const fill = document.getElementById('sim-fill');
+  fill.style.width      = pct + '%';
+  fill.style.background = match ? 'var(--green)' : (pct >= 55 ? 'var(--amber)' : 'var(--red)');
+  document.getElementById('sim-val-txt').textContent = pct + '%';
+  document.getElementById('sim-val-txt').style.color = match ? 'var(--green)' : 'var(--red)';
+
+  // Overlay on camera feed
+  ov.className    = 'result-overlay show ' + (match ? 'match' : 'mismatch');
+  document.getElementById('result-icon').textContent = match ? '✅' : '❌';
+  document.getElementById('result-pct').textContent  = pct + '%';
+  document.getElementById('result-pct').style.color  = match ? 'var(--green)' : 'var(--red)';
+  document.getElementById('result-txt').textContent  = match
+    ? 'Identity Confirmed'
+    : 'Identity Mismatch';
+  document.getElementById('result-txt').style.color  = match ? 'var(--green)' : 'var(--red)';
+
+  if (match) {
+    document.getElementById('status-hint').textContent = '✅ Identity verified!';
+    document.getElementById('status-hint').className   = 'status-hint ok';
+    document.getElementById('btn-proceed').style.display = '';
+    document.getElementById('btn-proceed').onclick = () => {
+      window.location = '/syscheck/' + SESSION_ID;
+    };
+  }
+}
+
+function resetCapture() {
+  const canvas = document.getElementById('snap-canvas');
+  canvas.style.display = 'none';
+  document.getElementById('result-ov').className = 'result-overlay';
+  document.getElementById('sim-meter').style.display = 'none';
+  document.getElementById('face-guide').style.display = '';
+  document.getElementById('rules-section').style.display = '';
+  document.getElementById('btn-retry').style.display = 'none';
+  document.getElementById('btn-proceed').style.display = 'none';
+  document.getElementById('btn-capture').disabled = false;
+  document.getElementById('status-hint').textContent = 'Ready. Align your face in the oval.';
+  document.getElementById('status-hint').className = 'status-hint';
+  capturing = false;
+}
+
+startCamera();
+</script>
+
+{% if result and result.match %}
+<script>
+// Auto-proceed on server-rendered success (POST returned success, not redirect)
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('btn-proceed');
+  if (btn) {
+    showResult(true, {{ result.sim }});
+    btn.onclick = () => window.location = '/syscheck/{{ session.id }}';
+    setTimeout(() => window.location = '/syscheck/{{ session.id }}', 2000);
+  }
+});
+</script>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Users — Admin{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Admin</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/admin"><span class="icon">🏠</span>Dashboard</a>
+      <a class="nav-item" href="/admin/live"><span class="icon">📡</span>Live Monitor</a>
+      <a class="nav-item active" href="/admin/users"><span class="icon">👥</span>Users</a>
+      <a class="nav-item" href="/admin/exams"><span class="icon">📋</span>Exams</a>
+      <a class="nav-item" href="/admin/sessions"><span class="icon">📁</span>Sessions</a>
+      <a class="nav-item" href="/admin/logs"><span class="icon">🗒️</span>Logs</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">Administrator</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+  <div class="main-area">
+    <div class="topbar">
+      <div><h2>Users</h2><div class="breadcrumb">{{ users|length }} total</div></div>
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('create-modal').classList.add('open')">➕ Add User</button>
+    </div>
+    <div class="page-content">
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for u in users %}
+              <tr>
+                <td style="font-weight:600;color:var(--text0);">{{ u.name }}</td>
+                <td style="font-size:.8rem;color:var(--text2);">{{ u.email }}</td>
+                <td>
+                  <span class="badge {% if u.role=='admin' %}badge-red{% elif u.role=='teacher' %}badge-amber{% else %}badge-blue{% endif %}">{{ u.role }}</span>
+                </td>
+                <td style="font-size:.75rem;color:var(--text3);">{{ u.created_at[:10] }}</td>
+                <td>
+                  {% if u.active %}<span class="badge badge-green">Active</span>
+                  {% else %}<span class="badge badge-gray">Disabled</span>{% endif %}
+                </td>
+                <td>
+                  <a href="/admin/users/{{ u.id }}/toggle" class="btn btn-ghost btn-sm">
+                    {% if u.active %}Disable{% else %}Enable{% endif %}
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="create-modal">
+  <div class="modal">
+    <h3>➕ Create User</h3>
+    <p>Add a new admin, teacher, or student account.</p>
+    <form method="POST" action="/admin/users/create">
+      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" name="name" required placeholder="Jane Smith"></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" name="email" type="email" required placeholder="jane@school.edu"></div>
+      <div class="form-group"><label class="form-label">Password</label><input class="form-input" name="password" type="password" required placeholder="••••••••"></div>
+      <div class="form-group"><label class="form-label">Role</label>
+        <select class="form-select" name="role">
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" type="button" onclick="document.getElementById('create-modal').classList.remove('open')">Cancel</button>
+        <button class="btn btn-primary" type="submit">Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

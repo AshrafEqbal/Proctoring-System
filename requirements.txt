@@ -1,0 +1,25 @@
+<<<<<<< HEAD
+flask==3.0.3
+flask-socketio==5.3.6
+gunicorn==21.2.0
+eventlet==0.35.2
+werkzeug==3.0.1
+
+numpy==1.26.4
+opencv-python-headless==4.9.0.80
+
+mediapipe==0.10.9
+ultralytics==8.2.0
+torch==2.2.2
+torchvision==0.17.2
+=======
+flask>=3.0.0
+flask-socketio>=5.3.6
+mediapipe>=0.10.0
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+eventlet>=0.35.0
+werkzeug>=3.0.0
+gunicorn
+>>>>>>> 7af4a12 (reset and push local)

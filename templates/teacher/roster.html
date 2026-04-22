@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block title %}Student Roster — {{ exam.title }}{% endblock %}
+
+{% block head %}
+<style>
+/* ── Import flash ── */
+.flash{padding:12px 16px;border-radius:10px;font-size:.83rem;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.flash-ok{background:rgba(34,211,160,.1);color:var(--green);border:1px solid rgba(34,211,160,.3);}
+.flash-err{background:rgba(240,90,90,.1);color:var(--red);border:1px solid rgba(240,90,90,.3);}
+
+/* ── Student grid ── */
+.stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.stu-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
+.stu-card:hover{border-color:var(--border2);}
+.stu-card.has-photo{border-color:rgba(34,211,160,.25);}
+.stu-card.no-photo{border-color:rgba(240,160,48,.25);}
+
+/* Photo area */
+.stu-photo{position:relative;aspect-ratio:4/3;background:var(--bg3);}
+.stu-photo img{width:100%;height:100%;object-fit:cover;}
+.stu-photo-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;color:var(--text3);}
+.stu-photo-empty .icon{font-size:2rem;}
+.stu-photo-empty p{font-size:.75rem;}
+.photo-status-badge{position:absolute;top:8px;left:8px;padding:3px 9px;border-radius:999px;font-size:.65rem;font-weight:700;}
+.badge-verified{background:rgba(34,211,160,.85);color:#0a1a15;}
+.badge-no-photo{background:rgba(240,160,48,.85);color:#1a0f00;}
+/* Upload overlay */
+.upload-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;}
+.stu-photo:hover .upload-overlay{display:flex;}
+.upload-overlay span{font-size:.8rem;color:#fff;font-weight:600;}
+
+/* Card body */
+.stu-body{padding:12px;}
+.stu-name{font-size:.9rem;font-weight:700;color:var(--text0);margin-bottom:2px;}
+.stu-email{font-size:.72rem;color:var(--text3);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stu-actions{display:flex;gap:6px;}
+.stu-actions button, .stu-actions label{flex:1;padding:5px 0;text-align:center;font-size:.72rem;cursor:pointer;}
+
+/* ── Debug overlay modal ── */
+.debug-modal{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;}
+.debug-modal.open{display:flex;}
+.debug-inner{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:24px;width:480px;max-width:95vw;}
+.debug-inner h3{font-size:1rem;margin-bottom:14px;color:var(--text0);}
+.debug-inner img{width:100%;border-radius:10px;border:1px solid var(--border);margin-bottom:12px;}
+.sim-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.sim-bar-track{flex:1;height:10px;background:var(--bg4);border-radius:5px;overflow:hidden;}
+.sim-bar-fill{height:100%;border-radius:5px;transition:width .5s,background .4s;}
+.sim-label{font-size:.82rem;font-weight:700;white-space:nowrap;}
+
+/* ── Add student form ── */
+.add-card{background:var(--bg2);border:2px dashed var(--border2);border-radius:12px;padding:20px;}
+.add-card h4{font-size:.85rem;font-weight:700;color:var(--text0);margin-bottom:14px;}
+.photo-drop-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;position:relative;transition:border-color .2s;margin-bottom:12px;}
+.photo-drop-zone:hover,.photo-drop-zone.drag{border-color:var(--accent);}
+.photo-drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.photo-preview{width:100%;height:120px;border-radius:8px;object-fit:cover;margin-top:8px;display:none;border:1px solid var(--border);}
+.face-detected{display:flex;align-items:center;gap:6px;font-size:.75rem;padding:5px 10px;border-radius:6px;margin-top:6px;}
+.face-ok{background:rgba(34,211,160,.1);color:var(--green);border:1px solid rgba(34,211,160,.25);}
+.face-bad{background:rgba(240,160,48,.1);color:var(--amber);border:1px solid rgba(240,160,48,.25);}
+
+/* ── CSV import ── */
+.csv-section{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;}
+.csv-hint{font-size:.75rem;color:var(--text3);margin-top:6px;line-height:1.5;}
+
+/* ── Stats strip ── */
+.roster-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
+.rs-box{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:120px;}
+.rs-val{font-size:1.4rem;font-weight:700;color:var(--text0);}
+.rs-lbl{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+
+/* empty state */
+.empty-roster{grid-column:1/-1;text-align:center;padding:40px;color:var(--text3);}
+.empty-roster .icon{font-size:2.5rem;margin-bottom:10px;}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Teacher</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/teacher"><span class="icon">📋</span>My Exams</a>
+      <a class="nav-item active" href="#"><span class="icon">👥</span>Roster</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">{{ user.role }}</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div>
+        <h2>Student Roster</h2>
+        <div class="breadcrumb">
+          <a href="/teacher">My Exams</a> →
+          <a href="/teacher/exam/{{ exam.id }}/edit">{{ exam.title }}</a> →
+          Roster
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        {% if exam.face_verify_enabled %}
+        <span class="badge badge-green">🪪 Face Verify ON</span>
+        {% else %}
+        <span class="badge badge-gray">🪪 Face Verify OFF</span>
+        {% endif %}
+        <a href="/teacher/exam/{{ exam.id }}/edit" class="btn btn-ghost btn-sm">✏️ Edit Exam</a>
+        <a href="/teacher/exam/{{ exam.id }}/monitor" class="btn btn-ghost btn-sm">👁 Monitor</a>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      {% set imported = request.args.get('imported') %}
+      {% if imported %}
+      <div class="flash flash-ok">✅ Imported {{ imported }} student(s) from CSV. Add photos individually below.</div>
+      {% endif %}
+
+      {% if not exam.face_verify_enabled %}
+      <div class="alert alert-info" style="margin-bottom:20px;">
+        ℹ️ Face identity verification is <strong>disabled</strong> for this exam. Enable it in
+        <a href="/teacher/exam/{{ exam.id }}/edit" style="color:var(--accent)">Settings</a>
+        to use the roster for identity checking.
+      </div>
+      {% endif %}
+
+      <!-- Stats -->
+      {% set with_photo = students | selectattr('embedding') | list %}
+      <div class="roster-stats">
+        <div class="rs-box"><div class="rs-val">{{ students|length }}</div><div class="rs-lbl">Enrolled</div></div>
+        <div class="rs-box"><div class="rs-val" style="color:var(--green)">{{ with_photo|length }}</div><div class="rs-lbl">With Photo</div></div>
+        <div class="rs-box"><div class="rs-val" style="color:var(--amber)">{{ students|length - with_photo|length }}</div><div class="rs-lbl">No Photo Yet</div></div>
+      </div>
+
+      <!-- Two-column layout: student list + add form -->
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
+
+        <!-- Student grid -->
+        <div>
+          <div class="stu-grid" id="stu-grid">
+            {% if not students %}
+            <div class="empty-roster">
+              <div class="icon">👥</div>
+              <p>No students enrolled yet.<br>Add individually or import a CSV →</p>
+            </div>
+            {% endif %}
+
+            {% for s in students %}
+            <div class="stu-card {{ 'has-photo' if s.embedding else 'no-photo' }}" id="sc-{{ s.id }}">
+              <div class="stu-photo" id="sphoto-{{ s.id }}">
+                {% if s.photo %}
+                <img src="/uploads/enrolled/{{ s.photo }}" alt="{{ s.name }}" id="simg-{{ s.id }}">
+                {% else %}
+                <div class="stu-photo-empty" id="simg-{{ s.id }}">
+                  <div class="icon">📷</div>
+                  <p>No photo yet</p>
+                </div>
+                {% endif %}
+                <span class="photo-status-badge {{ 'badge-verified' if s.embedding else 'badge-no-photo' }}">
+                  {{ '✓ ID Ready' if s.embedding else '⚠ No Photo' }}
+                </span>
+                <!-- Hover upload overlay -->
+                <label class="upload-overlay" for="photo-inp-{{ s.id }}">
+                  <span>📷</span>
+                  <span>{{ 'Replace Photo' if s.photo else 'Upload Photo' }}</span>
+                </label>
+                <input type="file" id="photo-inp-{{ s.id }}" accept="image/*"
+                       style="display:none"
+                       onchange="uploadStudentPhoto({{ s.id }}, this)">
+              </div>
+              <div class="stu-body">
+                <div class="stu-name">{{ s.name }}</div>
+                <div class="stu-email" title="{{ s.email }}">{{ s.email }}</div>
+                <div class="stu-actions">
+                  <label class="btn btn-ghost btn-sm" for="photo-inp-{{ s.id }}" style="cursor:pointer;">
+                    📷 Photo
+                  </label>
+                  <form method="POST" action="/teacher/exam/{{ exam.id }}/roster/delete/{{ s.id }}"
+                        style="flex:1;" onsubmit="return confirm('Remove {{ s.name }}?')">
+                    <button type="submit" class="btn btn-danger btn-sm" style="width:100%;">🗑️</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Right column: Add + CSV import -->
+        <div style="display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;">
+
+          <!-- Add single student -->
+          <div class="add-card">
+            <h4>➕ Add Student</h4>
+            <form method="POST" action="/teacher/exam/{{ exam.id }}/roster/add" enctype="multipart/form-data">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input class="form-input" type="text" name="name" placeholder="Student full name" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-input" type="email" name="email" placeholder="student@example.com" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Reference Photo <span style="color:var(--text3);font-weight:400;">(optional, add later)</span></label>
+                <div class="photo-drop-zone" id="add-drop-zone">
+                  <input type="file" name="photo" accept="image/*" id="add-photo-inp" onchange="previewAddPhoto(this)">
+                  <div style="color:var(--text3);font-size:.8rem;">
+                    <div style="font-size:1.4rem;margin-bottom:4px;">📷</div>
+                    Click or drag photo here
+                  </div>
+                  <img class="photo-preview" id="add-photo-preview" alt="">
+                  <div id="add-face-status"></div>
+                </div>
+              </div>
+              <button class="btn btn-primary" type="submit" style="width:100%;">Add Student</button>
+            </form>
+          </div>
+
+          <!-- CSV bulk import -->
+          <div class="csv-section">
+            <div style="font-size:.85rem;font-weight:700;color:var(--text0);margin-bottom:10px;">📄 Bulk Import CSV</div>
+            <form method="POST" action="/teacher/exam/{{ exam.id }}/roster/csv" enctype="multipart/form-data">
+              <input class="form-input" type="file" name="csv_file" accept=".csv,.txt" style="margin-bottom:8px;">
+              <button class="btn btn-ghost btn-sm" type="submit" style="width:100%;">Import CSV</button>
+            </form>
+            <div class="csv-hint">
+              CSV format: <code style="color:var(--accent)">name,email</code><br>
+              First row is treated as header. Photos must be added individually after import.
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Debug / result modal ── -->
+<div class="debug-modal" id="debug-modal">
+  <div class="debug-inner">
+    <h3 id="debug-title">Photo Processed</h3>
+    <img id="debug-img" src="" alt="Processed photo with landmarks">
+    <div class="sim-bar-wrap" id="sim-bar-wrap" style="display:none;">
+      <div class="sim-bar-track"><div class="sim-bar-fill" id="sim-bar-fill"></div></div>
+      <span class="sim-label" id="sim-label"></span>
+    </div>
+    <p id="debug-msg" style="font-size:.82rem;color:var(--text2);margin-bottom:14px;"></p>
+    <div style="display:flex;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="document.getElementById('debug-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Upload reference photo for existing student ───────────────────────────
+async function uploadStudentPhoto(studentId, input) {
+  const f = input.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append('photo', f);
+
+  toast('Uploading and processing photo…');
+
+  const res = await fetch(
+    `/teacher/exam/{{ exam.id }}/roster/upload_photo/${studentId}`,
+    {method:'POST', body:fd}
+  );
+  const d = await res.json();
+
+  if (d.ok) {
+    // Update card image
+    const card = document.getElementById('sc-'+studentId);
+    if (card) {
+      card.className = card.className.replace('no-photo','has-photo');
+      const imgWrap = document.getElementById('sphoto-'+studentId);
+      const badge   = imgWrap.querySelector('.photo-status-badge');
+      badge.className = 'photo-status-badge badge-verified';
+      badge.textContent = '✓ ID Ready';
+      // Replace the img/empty div
+      let img = imgWrap.querySelector('img');
+      if (!img) {
+        img = document.createElement('img');
+        img.id = 'simg-'+studentId;
+        img.alt = '';
+        imgWrap.insertBefore(img, imgWrap.firstChild);
+        // Remove the empty placeholder if present
+        const empty = imgWrap.querySelector('.stu-photo-empty');
+        if (empty) empty.remove();
+      }
+      img.src = d.photo_url+'?t='+Date.now();
+    }
+    // Show landmark debug
+    showDebugModal('Photo Processed — Face Detected ✓', d.debug_img,
+      'Facial landmarks extracted. This student\'s identity is now registered.', null);
+    toast('✅ Photo uploaded and face registered!');
+  } else {
+    toast('❌ ' + (d.error || 'Upload failed'));
+    showDebugModal('⚠️ Face Detection Failed', null,
+      d.error || 'Could not detect a face. Try a clearer, well-lit frontal photo.', null);
+  }
+}
+
+// ── Preview photo in add form ─────────────────────────────────────────────
+function previewAddPhoto(input) {
+  const f = input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById('add-photo-preview');
+    prev.src = e.target.result;
+    prev.style.display = 'block';
+    document.getElementById('add-face-status').innerHTML =
+      '<div class="face-detected face-ok">✓ Photo selected — face will be extracted on save</div>';
+  };
+  reader.readAsDataURL(f);
+}
+
+// ── Debug modal ───────────────────────────────────────────────────────────
+function showDebugModal(title, imgSrc, msg, sim) {
+  document.getElementById('debug-title').textContent = title;
+  const img = document.getElementById('debug-img');
+  if (imgSrc) { img.src = imgSrc; img.style.display = 'block'; }
+  else          { img.style.display = 'none'; }
+  document.getElementById('debug-msg').textContent = msg || '';
+  const barWrap = document.getElementById('sim-bar-wrap');
+  if (sim !== null && sim !== undefined) {
+    barWrap.style.display = 'flex';
+    const fill  = document.getElementById('sim-bar-fill');
+    const label = document.getElementById('sim-label');
+    const pct   = Math.round(sim*100);
+    fill.style.width      = pct+'%';
+    fill.style.background = sim>=0.72?'var(--green)':sim>=0.55?'var(--amber)':'var(--red)';
+    label.textContent     = pct+'%';
+    label.style.color     = sim>=0.72?'var(--green)':sim>=0.55?'var(--amber)':'var(--red)';
+  } else { barWrap.style.display = 'none'; }
+  document.getElementById('debug-modal').classList.add('open');
+}
+
+// ── Drag-drop styling ─────────────────────────────────────────────────────
+const dz = document.getElementById('add-drop-zone');
+if (dz) {
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    if (e.dataTransfer.files[0]) {
+      const inp = document.getElementById('add-photo-inp');
+      // Assign files
+      const dt = new DataTransfer();
+      dt.items.add(e.dataTransfer.files[0]);
+      inp.files = dt.files;
+      previewAddPhoto(inp);
+    }
+  });
+}
+</script>
+{% endblock %}

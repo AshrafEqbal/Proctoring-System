@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Student Portal — ProctorVault{% endblock %}
+{% block body %}
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg0);">
+  <div style="text-align:center;max-width:420px;">
+    <div style="font-size:3rem;margin-bottom:16px;">🎓</div>
+    <h2 style="font-size:1.4rem;color:var(--text0);margin-bottom:8px;">Welcome, {{ user.name }}</h2>
+    <p style="font-size:.88rem;color:var(--text3);margin-bottom:28px;">To join an exam, use your exam code on the join page.</p>
+    <a href="/join" class="btn btn-primary btn-lg">Join an Exam →</a>
+    <div style="margin-top:16px;"><a href="/logout" style="font-size:.8rem;color:var(--text3);">Sign out</a></div>
+  </div>
+</div>
+{% endblock %}

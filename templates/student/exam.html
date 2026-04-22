@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ session.title }} — ProctorVault</title>
+<!-- MathJax for LaTeX equations -->
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']], processEscapes: true },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js" crossorigin="anonymous"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+:root{
+  --bg0:#07090f;--bg1:#0d1117;--bg2:#141924;--bg3:#1c2333;--bg4:#1e2840;
+  --border:#2a3550;--border2:#364060;
+  --text0:#f0f4ff;--text1:#c8d3f0;--text2:#7b8db8;--text3:#4a5578;
+  --accent:#4f8ef7;--accent2:#2563eb;
+  --green:#22d3a0;--green2:#16a37a;--red:#f05a5a;--amber:#f0a030;
+  --font:'DM Sans',sans-serif;--mono:'Space Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg0);color:var(--text1);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── Top bar ── */
+.topbar{background:var(--bg1);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;z-index:10;}
+.tb-left{min-width:0;}
+.tb-title{font-size:.92rem;font-weight:700;color:var(--text0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tb-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.timer{font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--text0);background:var(--bg3);padding:5px 12px;border-radius:8px;border:1px solid var(--border);}
+.timer.warn{color:var(--amber);border-color:rgba(240,160,48,.4);}
+.timer.crit{color:var(--red);border-color:rgba(240,90,90,.5);animation:tpulse 1s infinite;}
+@keyframes tpulse{0%,100%{background:var(--bg3)}50%{background:rgba(240,90,90,.15)}}
+/* ID badge in topbar */
+.id-badge{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:.7rem;font-weight:700;border:1px solid;white-space:nowrap;}
+.id-ok{background:rgba(34,211,160,.1);color:var(--green);border-color:rgba(34,211,160,.3);}
+.id-fail{background:rgba(240,90,90,.1);color:var(--red);border-color:rgba(240,90,90,.3);}
+.id-pending{background:var(--bg3);color:var(--text3);border-color:var(--border);}
+.id-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:idpulse 2s infinite;}
+@keyframes idpulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Layout ── */
+.exam-body{flex:1;display:flex;overflow:hidden;min-height:0;}
+
+/* ── Question panel ── */
+.q-panel{flex:1;overflow-y:auto;padding:24px 28px;display:flex;flex-direction:column;min-width:0;}
+.q-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+.q-num{font-size:.72rem;color:var(--text3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+.q-pts{font-size:.72rem;background:var(--bg3);color:var(--accent);padding:3px 10px;border-radius:999px;border:1px solid var(--border);}
+
+/* Q dots nav strip */
+.q-strip{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px;}
+.q-dot{width:28px;height:28px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;cursor:pointer;color:var(--text3);transition:all .15s;}
+.q-dot:hover{border-color:var(--border2);color:var(--text2);}
+.q-dot.answered{background:rgba(37,99,235,.2);border-color:var(--accent2);color:var(--accent);}
+.q-dot.current{background:var(--accent2);border-color:var(--accent2);color:#fff;}
+
+/* Rich content rendering */
+.q-content{margin-bottom:20px;}
+.q-block-text{font-size:1.05rem;font-weight:500;color:var(--text0);line-height:1.7;margin-bottom:8px;}
+.q-block-latex{font-size:1.05rem;color:var(--text0);line-height:1.8;margin-bottom:8px;padding:8px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);overflow-x:auto;}
+.q-block-img{margin-bottom:10px;}
+.q-block-img img{max-width:100%;max-height:340px;border-radius:10px;border:1px solid var(--border);object-fit:contain;background:var(--bg3);}
+
+/* Options */
+.options{display:flex;flex-direction:column;gap:10px;margin-bottom:24px;}
+.option{
+  display:flex;align-items:flex-start;gap:14px;
+  padding:14px 18px;background:var(--bg2);border:2px solid var(--border);
+  border-radius:12px;cursor:pointer;transition:all .18s;user-select:none;
+}
+.option:hover{border-color:var(--border2);background:var(--bg3);}
+.option.selected{border-color:var(--accent2);background:rgba(37,99,235,.1);}
+.option.selected .opt-bubble{background:var(--accent2);border-color:var(--accent2);color:#fff;}
+.opt-bubble{
+  width:30px;height:30px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;margin-top:1px;
+  font-size:.75rem;font-weight:700;color:var(--text3);transition:all .18s;
+}
+.opt-content{flex:1;min-width:0;}
+.opt-text-line{font-size:.92rem;color:var(--text1);line-height:1.6;}
+.opt-img{max-width:100%;max-height:180px;border-radius:8px;border:1px solid var(--border);margin-top:6px;object-fit:contain;}
+.opt-latex{font-size:.92rem;color:var(--text1);padding:4px 0;}
+
+/* Nav */
+.q-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:16px;border-top:1px solid var(--border);margin-top:auto;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--font);white-space:nowrap;}
+.btn:disabled{opacity:.3;cursor:not-allowed;}
+.btn-primary{background:var(--accent2);color:#fff;}
+.btn-primary:not(:disabled):hover{background:var(--accent);}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:not(:disabled):hover{color:var(--text0);}
+.btn-submit{background:linear-gradient(135deg,var(--green2),var(--accent2));color:#fff;}
+
+/* ── Proctor sidebar ── */
+.proctor-side{
+  width:256px;min-width:240px;background:var(--bg1);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;
+  overflow-y:auto;flex-shrink:0;
+}
+.ps-sec{padding:13px;border-bottom:1px solid var(--border);}
+.ps-lbl{font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:9px;}
+.cam-box{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;}
+.cam-box img{width:100%;height:100%;object-fit:cover;}
+.cam-hint{position:absolute;bottom:6px;right:7px;font-size:.6rem;color:rgba(255,255,255,.45);}
+.sc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.sc-lbl{font-size:.74rem;color:var(--text2);}
+.sc-val{font-size:.8rem;font-weight:700;}
+.bar-t{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:9px;}
+.bar-f{height:100%;border-radius:3px;transition:width .5s,background .4s;}
+.audio-wrap{background:var(--bg3);border-radius:8px;overflow:hidden;height:44px;border:1px solid var(--border);}
+/* ID score row */
+.id-score-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:8px;}
+.id-score-label{font-size:.72rem;color:var(--text2);}
+.id-score-val{font-size:.8rem;font-weight:700;}
+/* Event log */
+.ev-log{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;}
+.ev{display:flex;gap:6px;font-size:.7rem;padding:5px 7px;background:var(--bg3);border-radius:6px;border-left:2px solid var(--border);}
+.ev.warn{border-left-color:var(--amber);}
+.ev.bad{border-left-color:var(--red);}
+.ev.good{border-left-color:var(--green);}
+.ev-t{color:var(--text3);white-space:nowrap;padding-top:1px;}
+.ev-m{color:var(--text2);}
+/* conn */
+.conn-dot{width:7px;height:7px;border-radius:50%;animation:cb 1.5s infinite;}
+@keyframes cb{0%,100%{opacity:1}50%{opacity:.2}}
+.c-ok{background:var(--green);} .c-bad{background:var(--red);}
+
+/* ── Lock overlay ── */
+.lock-ov{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(7,9,15,.94);backdrop-filter:blur(14px);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+}
+.lock-ov.on{display:flex;animation:lockIn .3s ease both;}
+@keyframes lockIn{from{opacity:0}to{opacity:1}}
+.lock-icon{font-size:4rem;animation:shake .4s ease;}
+@keyframes shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(8deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(4deg)}}
+.lock-ttl{font-size:1.9rem;font-weight:800;color:var(--red);}
+.lock-sub{font-size:.9rem;color:var(--text2);max-width:360px;text-align:center;line-height:1.6;}
+.lock-note{font-size:.75rem;color:var(--text3);}
+
+/* ── Blur/pause overlay ── */
+.blur-ov{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(7,9,15,.55);backdrop-filter:blur(22px);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+}
+.blur-ov.on{display:flex;}
+.blur-ttl{font-size:1.35rem;font-weight:700;color:var(--amber);}
+.blur-sub{font-size:.85rem;color:var(--text2);text-align:center;max-width:300px;}
+
+/* ── Submit modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:400;display:none;align-items:center;justify-content:center;}
+.modal-bg.on{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;width:420px;max-width:90vw;box-shadow:0 30px 80px rgba(0,0,0,.6);}
+.modal h3{font-size:1.1rem;margin-bottom:8px;color:var(--text0);}
+.modal p{font-size:.85rem;color:var(--text2);margin-bottom:18px;line-height:1.6;}
+.modal-acts{display:flex;gap:8px;justify-content:flex-end;}
+
+/* MathJax overrides */
+mjx-container{color:var(--text0) !important;}
+
+@media(max-width:800px){.proctor-side{display:none;}}
+</style>
+</head>
+<body>
+
+<!-- ── Lock overlay ── -->
+<div class="lock-ov" id="lock-ov">
+  <div class="lock-icon">🔒</div>
+  <div class="lock-ttl">Session Locked</div>
+  <div class="lock-sub" id="lock-reason-txt">Your exam has been suspended. Contact your invigilator to continue.</div>
+  <div class="lock-note">Your answers up to this point have been saved automatically.</div>
+</div>
+
+<!-- ── Blur/pause overlay ── -->
+<div class="blur-ov" id="blur-ov">
+  <div style="font-size:3rem;">⏸️</div>
+  <div class="blur-ttl">Exam Paused</div>
+  <div class="blur-sub" id="blur-reason-txt">Your session has been paused. Please wait for the proctor.</div>
+</div>
+
+<!-- ── Submit modal ── -->
+<div class="modal-bg" id="submit-modal">
+  <div class="modal">
+    <h3>Submit Exam?</h3>
+    <p>You have answered <strong id="ans-count">0</strong> of <strong>{{ questions|length }}</strong> questions. Once submitted you cannot change your answers.</p>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="document.getElementById('submit-modal').classList.remove('on')">Cancel</button>
+      <button class="btn btn-submit" onclick="doSubmit()">Submit Now →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <div class="tb-left">
+    <div class="tb-title">{{ session.title }}</div>
+    <div style="font-size:.7rem;color:var(--text3);margin-top:1px;">{{ session.student_name }} · {{ session.student_email }}</div>
+  </div>
+  <div class="tb-right">
+    {% if session.face_verify_enabled %}
+    <div class="id-badge id-pending" id="id-badge"><span class="id-dot"></span><span id="id-badge-txt">ID Monitoring</span></div>
+    {% endif %}
+    <div class="timer" id="timer">--:--</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);">
+      <div class="conn-dot" id="conn-dot"></div><span id="conn-txt">Connecting</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main body ── -->
+<div class="exam-body">
+
+  <!-- Question panel -->
+  <div class="q-panel" id="q-panel">
+    <div class="q-meta">
+      <span class="q-num" id="q-num">Question 1 of {{ questions|length }}</span>
+      <span class="q-pts" id="q-pts">1 pt</span>
+    </div>
+
+    <!-- Question nav dots -->
+    <div class="q-strip" id="q-strip"></div>
+
+    <!-- Rich question content -->
+    <div class="q-content" id="q-content"></div>
+
+    <!-- Options -->
+    <div class="options" id="options-list"></div>
+
+    <!-- Nav buttons -->
+    <div class="q-nav">
+      <button class="btn btn-ghost" id="btn-prev" onclick="navigate(-1)">← Prev</button>
+      <button class="btn btn-primary" id="btn-next" onclick="navigate(1)">Next →</button>
+      <button class="btn btn-submit" id="btn-submit" style="display:none" onclick="openSubmit()">Submit Exam ✓</button>
+    </div>
+  </div>
+
+  <!-- Proctor sidebar -->
+  <div class="proctor-side">
+
+    <div class="ps-sec">
+      <div class="ps-lbl" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Live Feed</span>
+        <span id="proc-dot" style="font-size:.65rem;color:var(--text3);">●</span>
+      </div>
+      <div class="cam-box">
+        <img id="proc-img" src="" alt="feed" style="opacity:.25">
+        <span class="cam-hint" id="cam-hint">Initializing…</span>
+      </div>
+    </div>
+
+    <div class="ps-sec">
+      <div class="ps-lbl">Scores</div>
+      <div class="sc-row"><span class="sc-lbl">Attention</span><span class="sc-val" id="att-v" style="color:var(--green)">—</span></div>
+      <div class="bar-t"><div class="bar-f" id="att-b" style="width:70%;background:var(--green)"></div></div>
+      <div class="sc-row"><span class="sc-lbl">Suspicion</span><span class="sc-val" id="sus-v" style="color:var(--green)">—</span></div>
+      <div class="bar-t"><div class="bar-f" id="sus-b" style="width:30%;background:var(--green)"></div></div>
+      {% if session.face_verify_enabled %}
+      <div class="id-score-row">
+        <span class="id-score-label">Identity Match</span>
+        <span class="id-score-val" id="id-score-v" style="color:var(--text3)">—</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="ps-sec">
+      <div class="ps-lbl">Audio Level</div>
+      <div class="audio-wrap"><canvas id="audio-cv" style="width:100%;height:44px;"></canvas></div>
+    </div>
+
+    <div class="ps-sec" style="flex:1;">
+      <div class="ps-lbl">Event Log</div>
+      <div class="ev-log" id="ev-log"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Data from server ────────────────────────────────────────────────────────
+const SESSION_ID = "{{ session.id }}";
+const DURATION   = {{ session.duration_mins }} * 60;
+const FACE_VER   = {{ 'true' if session.face_verify_enabled else 'false' }};
+const QUESTIONS  = {{ questions|tojson }};
+const SAVED_ANS  = {{ answers|tojson }};
+
+// Pre-parse rich content
+QUESTIONS.forEach(q => {
+  if (typeof q.content_parsed === 'undefined') {
+    try { q.content_parsed = JSON.parse(q.content); }
+    catch { q.content_parsed = { blocks: [{type:'text',value: q.content || ''}] }; }
+  }
+  if (typeof q.options_parsed === 'undefined') {
+    try {
+      const raw = (typeof q.options === 'string') ? JSON.parse(q.options) : q.options;
+      q.options_parsed = raw.map(o => typeof o === 'object' ? o : {type:'text',value:String(o)});
+    } catch { q.options_parsed = []; }
+  }
+});
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentQ = 0;
+let answers  = {...SAVED_ANS};
+let timeLeft = DURATION;
+let timerInt = null;
+let locked = false, paused = false;
+let stream = null, capturing = false;
+let audioCtx = null, analyser = null;
+const FPS = 4;
+
+// ── Rich content renderer ─────────────────────────────────────────────────
+function renderBlocks(blocks, container) {
+  container.innerHTML = '';
+  if (!blocks || !blocks.length) return;
+  blocks.forEach(block => {
+    const div = document.createElement('div');
+    if (block.type === 'text') {
+      div.className = 'q-block-text';
+      div.textContent = block.value;
+    } else if (block.type === 'latex') {
+      div.className = 'q-block-latex';
+      // wrap in display math delimiter if not already wrapped
+      const raw = block.value.trim();
+      const wrapped = (raw.startsWith('$$') || raw.startsWith('\\[')) ? raw : `$$${raw}$$`;
+      div.innerHTML = wrapped;
+    } else if (block.type === 'image') {
+      div.className = 'q-block-img';
+      const img = document.createElement('img');
+      img.src = block.value;
+      img.alt = 'Question image';
+      img.onerror = () => { img.style.display='none'; };
+      div.appendChild(img);
+    }
+    container.appendChild(div);
+  });
+  // Typeset any new LaTeX
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([container]).catch(e => console.warn('MathJax error', e));
+  }
+}
+
+function renderOptionContent(opt, bubble_letter) {
+  const wrap = document.createElement('div');
+  wrap.className = 'opt-content';
+
+  if (opt.type === 'latex') {
+    const p = document.createElement('div');
+    p.className = 'opt-latex';
+    const raw = opt.value.trim();
+    p.innerHTML = (raw.startsWith('$') || raw.startsWith('\\(') || raw.startsWith('\\[') || raw.startsWith('$$'))
+                  ? raw : `\\(${raw}\\)`;
+    wrap.appendChild(p);
+  } else {
+    const p = document.createElement('div');
+    p.className = 'opt-text-line';
+    p.textContent = opt.value || '';
+    wrap.appendChild(p);
+  }
+  if (opt.image) {
+    const img = document.createElement('img');
+    img.src = opt.image; img.className = 'opt-img'; img.alt = '';
+    img.onerror = () => img.style.display='none';
+    wrap.appendChild(img);
+  }
+  return wrap;
+}
+
+// ── Dot strip ──────────────────────────────────────────────────────────────
+function buildStrip() {
+  const el = document.getElementById('q-strip');
+  el.innerHTML = '';
+  QUESTIONS.forEach((q, i) => {
+    const d = document.createElement('div');
+    const cls = ['q-dot'];
+    if (answers[String(q.id)] !== undefined) cls.push('answered');
+    if (i === currentQ) cls.push('current');
+    d.className = cls.join(' ');
+    d.textContent = i+1;
+    d.title = `Q${i+1} — ${q.points} pt${q.points>1?'s':''}`;
+    d.onclick = () => goTo(i);
+    el.appendChild(d);
+  });
+}
+
+// ── Render current question ────────────────────────────────────────────────
+function renderQuestion() {
+  if (!QUESTIONS.length) return;
+  const q = QUESTIONS[currentQ];
+  document.getElementById('q-num').textContent = `Question ${currentQ+1} of ${QUESTIONS.length}`;
+  document.getElementById('q-pts').textContent = `${q.points} pt${q.points>1?'s':''}`;
+
+  // Rich question body
+  const content = q.content_parsed || {blocks:[]};
+  renderBlocks(content.blocks, document.getElementById('q-content'));
+
+  // Options
+  const ol = document.getElementById('options-list');
+  ol.innerHTML = '';
+  const letters = ['A','B','C','D','E','F'];
+  const opts = q.options_parsed || [];
+  opts.forEach((opt, i) => {
+    const sel = answers[String(q.id)] !== undefined && parseInt(answers[String(q.id)]) === i;
+    const div = document.createElement('div');
+    div.className = 'option' + (sel ? ' selected' : '');
+
+    const bubble = document.createElement('div');
+    bubble.className = 'opt-bubble';
+    if (sel) { bubble.style.background='var(--accent2)'; bubble.style.borderColor='var(--accent2)'; bubble.style.color='#fff'; }
+    bubble.textContent = letters[i];
+
+    div.appendChild(bubble);
+    div.appendChild(renderOptionContent(opt, letters[i]));
+    div.onclick = () => selectAnswer(q.id, i, div, bubble);
+    ol.appendChild(div);
+  });
+
+  // Typeset options too
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([ol]).catch(() => {});
+  }
+
+  const isLast = currentQ === QUESTIONS.length-1;
+  document.getElementById('btn-prev').disabled = currentQ === 0;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : '';
+  document.getElementById('btn-submit').style.display = isLast ? '' : 'none';
+  buildStrip();
+}
+
+function selectAnswer(qid, idx, el, bubble) {
+  if (locked || paused) return;
+  answers[String(qid)] = idx;
+  document.querySelectorAll('.option').forEach(o => {
+    o.classList.remove('selected');
+    const b = o.querySelector('.opt-bubble');
+    if (b) { b.style.background=''; b.style.borderColor=''; b.style.color=''; }
+  });
+  el.classList.add('selected');
+  bubble.style.background = 'var(--accent2)';
+  bubble.style.borderColor = 'var(--accent2)';
+  bubble.style.color = '#fff';
+  buildStrip();
+  socket.emit('submit_answer', {q_id: qid, answer: idx, q_idx: currentQ, session_id: SESSION_ID});
+}
+
+function navigate(dir) { goTo(currentQ + dir); }
+function goTo(idx) {
+  if (idx < 0 || idx >= QUESTIONS.length) return;
+  currentQ = idx; renderQuestion();
+}
+function openSubmit() {
+  document.getElementById('ans-count').textContent = Object.keys(answers).length;
+  document.getElementById('submit-modal').classList.add('on');
+}
+function doSubmit() { socket.emit('submit_exam', {session_id: SESSION_ID}); }
+
+// ── Timer ──────────────────────────────────────────────────────────────────
+function startTimer() {
+  timerInt = setInterval(() => {
+    if (paused || locked) return;
+    timeLeft = Math.max(0, timeLeft-1);
+    const m = Math.floor(timeLeft/60).toString().padStart(2,'0');
+    const s = (timeLeft%60).toString().padStart(2,'0');
+    const el = document.getElementById('timer');
+    el.textContent = `${m}:${s}`;
+    el.className = timeLeft<60 ? 'timer crit' : timeLeft<300 ? 'timer warn' : 'timer';
+    if (timeLeft <= 0) { clearInterval(timerInt); doSubmit(); }
+  }, 1000);
+}
+
+// ── Camera / capture ───────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(
+      {video:{width:640,height:480,facingMode:'user'}, audio:true});
+    audioCtx = new AudioContext();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 128;
+    src.connect(analyser);
+    drawAudio();
+    return true;
+  } catch(e) { addEv('Camera error: '+e.message, 'bad'); return false; }
+}
+
+function startCapture() {
+  const cv = document.createElement('canvas');
+  cv.width=640; cv.height=480;
+  const ctx = cv.getContext('2d');
+  const v = document.createElement('video');
+  v.srcObject = stream; v.play();
+  capturing = true;
+  setInterval(() => {
+    if (!capturing) return;
+    if (v.readyState < 2) return;
+    ctx.drawImage(v,0,0,640,480);
+    const b64 = cv.toDataURL('image/jpeg', 0.65);
+    let rms = 0;
+    if (analyser) {
+      const buf = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(buf);
+      rms = Math.sqrt(buf.reduce((s,x)=>s+x*x,0)/buf.length);
+    }
+    socket.emit('video_frame', {frame:b64, audio_rms:rms, session_id:SESSION_ID});
+  }, 1000/FPS);
+}
+
+// ── Audio waveform ─────────────────────────────────────────────────────────
+const audioCv = document.getElementById('audio-cv');
+const actx = audioCv.getContext('2d');
+const audioHist = new Array(80).fill(0);
+function drawAudio() {
+  if (!analyser) return;
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  const rms = Math.sqrt(buf.reduce((s,v)=>s+v*v,0)/buf.length);
+  audioHist.shift(); audioHist.push(rms);
+  const W = audioCv.width = audioCv.offsetWidth || 240;
+  const H = audioCv.height = audioCv.offsetHeight || 44;
+  actx.clearRect(0,0,W,H);
+  actx.strokeStyle = rms > 0.018 ? '#f05a5a' : '#22d3a0';
+  actx.lineWidth = 1.5;
+  actx.beginPath();
+  audioHist.forEach((v,i) => {
+    const x = (i/audioHist.length)*W;
+    const y = H/2 - Math.min(v/0.06,1)*H*0.44;
+    i===0 ? actx.moveTo(x,y) : actx.lineTo(x,y);
+  });
+  actx.stroke();
+  requestAnimationFrame(drawAudio);
+}
+
+// ── Event log ──────────────────────────────────────────────────────────────
+function addEv(msg, type='') {
+  const el = document.getElementById('ev-log');
+  const t = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const d = document.createElement('div');
+  d.className = `ev ${type}`;
+  d.innerHTML = `<span class="ev-t">${t}</span><span class="ev-m">${msg}</span>`;
+  el.prepend(d);
+  while (el.children.length > 40) el.lastChild.remove();
+}
+
+// ── Score display ──────────────────────────────────────────────────────────
+function updateScores(att, sus) {
+  const a = Math.max(0, Math.min(100, att));
+  const s = Math.max(0, Math.min(100, sus));
+  document.getElementById('att-v').textContent = a.toFixed(0)+'%';
+  document.getElementById('sus-v').textContent = s.toFixed(0)+'%';
+  const ab = document.getElementById('att-b'), sb = document.getElementById('sus-b');
+  ab.style.width = a+'%';
+  sb.style.width = s+'%';
+  const ac = a>60?'#22d3a0':a>35?'#f0a030':'#f05a5a';
+  const sc = s<40?'#22d3a0':s<70?'#f0a030':'#f05a5a';
+  ab.style.background = ac; document.getElementById('att-v').style.color = ac;
+  sb.style.background = sc; document.getElementById('sus-v').style.color = sc;
+}
+
+// ── Identity badge update ──────────────────────────────────────────────────
+function updateIdBadge(idResult) {
+  if (!FACE_VER) return;
+  const badge = document.getElementById('id-badge');
+  const txt   = document.getElementById('id-badge-txt');
+  const scorEl= document.getElementById('id-score-v');
+  if (!idResult) return;
+  const sim = idResult.sim || 0;
+  if (scorEl) { scorEl.textContent = (sim*100).toFixed(0)+'%'; scorEl.style.color = idResult.match ? '#22d3a0' : '#f05a5a'; }
+  if (idResult.match) {
+    badge.className = 'id-badge id-ok';
+    txt.textContent = `ID OK ${(sim*100).toFixed(0)}%`;
+  } else {
+    badge.className = 'id-badge id-fail';
+    txt.textContent = `ID FAIL ${(sim*100).toFixed(0)}% (${idResult.fails}×)`;
+    addEv(`⚠️ Identity mismatch (${(sim*100).toFixed(0)}% match)`, 'bad');
+  }
+}
+
+// ── Lock / pause ───────────────────────────────────────────────────────────
+function doLock(reason) {
+  locked = true; paused = true;
+  document.getElementById('lock-reason-txt').textContent = reason || 'Session locked.';
+  document.getElementById('lock-ov').classList.add('on');
+  document.getElementById('blur-ov').classList.remove('on');
+  addEv('🔒 LOCKED: '+reason, 'bad');
+}
+function doUnlock() {
+  locked = false; paused = false;
+  document.getElementById('lock-ov').classList.remove('on');
+  document.getElementById('blur-ov').classList.remove('on');
+  addEv('🔓 Session unlocked', 'good');
+}
+function doPause(reason) {
+  paused = true;
+  document.getElementById('blur-reason-txt').textContent = reason || 'Session paused.';
+  document.getElementById('blur-ov').classList.add('on');
+  addEv('⏸️ Paused: '+reason, 'warn');
+}
+
+// ── Socket ─────────────────────────────────────────────────────────────────
+const socket = io();
+
+socket.on('connect', () => {
+  document.getElementById('conn-dot').className = 'conn-dot c-ok';
+  document.getElementById('conn-txt').textContent = 'Live';
+  socket.emit('join_exam_proctor', {session_id: SESSION_ID});
+});
+
+socket.on('disconnect', () => {
+  document.getElementById('conn-dot').className = 'conn-dot c-bad';
+  document.getElementById('conn-txt').textContent = 'Offline';
+});
+
+socket.on('proctor_ready', async (data) => {
+  if (data.locked) { doLock('Previously locked session'); return; }
+  if (data.paused) doPause('Session paused');
+  const ok = await startCamera();
+  if (ok) {
+    startCapture();
+    document.getElementById('cam-hint').textContent = '● Live';
+    document.getElementById('proc-img').style.opacity = '.4';
+    addEv('✅ Monitoring started', 'good');
+  }
+  startTimer();
+  renderQuestion();
+});
+
+socket.on('processed_frame', (data) => {
+  const img = document.getElementById('proc-img');
+  img.src = data.frame;
+  img.style.opacity = '1';
+  document.getElementById('proc-dot').style.color = '#22d3a0';
+  updateScores(data.attention, data.suspicion);
+  if (data.id_result) updateIdBadge(data.id_result);
+  if (data.events && data.events.length) {
+    const notable = data.events.filter(e => !e.includes('center'));
+    if (notable.length) {
+      const msg = notable[0].replace(/_/g,' ');
+      const type = notable[0].includes('mismatch')||notable[0].includes('multi')||notable[0].includes('object') ? 'bad' : 'warn';
+      addEv(msg, type);
+    }
+  }
+});
+
+socket.on('session_locked',   (data) => doLock(data.reason || 'Locked by proctor'));
+socket.on('session_unlocked', ()     => doUnlock());
+socket.on('exam_submitted',   ()     => { clearInterval(timerInt); window.location = '/result/'+SESSION_ID; });
+
+// ── Init ───────────────────────────────────────────────────────────────────
+renderQuestion();
+</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Report — {{ exam.title }}{% endblock %}
+{% block head %}
+<style>
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+.cheat-row td{background:rgba(240,90,90,.05)!important;}
+.cheat-row{border-left:3px solid var(--red)!important;}
+.id-fail-badge{padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700;}
+.ev-chip{padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;display:inline-block;}
+.ev-lock{background:rgba(240,90,90,.15);color:var(--red);}
+.ev-id{background:rgba(167,139,250,.15);color:#a78bfa;}
+.ev-eye{background:rgba(240,160,48,.15);color:var(--amber);}
+.ev-obj{background:rgba(79,142,247,.15);color:var(--accent);}
+.ev-other{background:var(--bg4);color:var(--text2);}
+.section-head{font-size:.8rem;font-weight:700;color:var(--text0);margin:24px 0 12px;
+  display:flex;align-items:center;gap:8px;}
+.section-head::after{content:'';flex:1;height:1px;background:var(--border);}
+.per-student-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:14px;margin-bottom:10px;}
+.psc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.psc-name{font-size:.9rem;font-weight:700;color:var(--text0);}
+.psc-email{font-size:.72rem;color:var(--text3);}
+.psc-metrics{display:flex;gap:8px;flex-wrap:wrap;}
+.pm{font-size:.75rem;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;}
+.timeline{display:flex;flex-direction:column;gap:4px;margin-top:8px;}
+.tl-item{display:flex;gap:8px;font-size:.72rem;align-items:flex-start;padding:4px 8px;
+  background:var(--bg2);border-radius:6px;border-left:2px solid var(--border);}
+.tl-item.tl-lock{border-left-color:var(--red);}
+.tl-item.tl-id{border-left-color:#a78bfa;}
+.tl-item.tl-warn{border-left-color:var(--amber);}
+.tl-time{color:var(--text3);white-space:nowrap;min-width:55px;}
+.tl-msg{color:var(--text2);}
+</style>
+{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Teacher</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/teacher"><span class="icon">📋</span>My Exams</a>
+      <a class="nav-item" href="/teacher/exam/{{ exam.id }}/edit"><span class="icon">✏️</span>Edit Exam</a>
+      <a class="nav-item" href="/teacher/exam/{{ exam.id }}/roster"><span class="icon">👥</span>Roster</a>
+      <a class="nav-item active" href="#"><span class="icon">📊</span>Report</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">{{ user.role }}</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div>
+        <h2>{{ exam.title }}</h2>
+        <div class="breadcrumb">
+          <a href="/teacher">My Exams</a> → Report
+          {% if exam.face_verify_enabled %}
+          · <span style="color:#a78bfa;font-size:.82rem;">🪪 Face Verify ON ({{ (exam.face_verify_thresh*100)|int }}%)</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="/teacher/exam/{{ exam.id }}/monitor" class="btn btn-ghost btn-sm">👁 Live</a>
+        <a href="/teacher/exam/{{ exam.id }}/roster"  class="btn btn-ghost btn-sm">👥 Roster</a>
+        <a href="/api/report/{{ exam.id }}/download"  class="btn btn-primary btn-sm">⬇ Download</a>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      {# ── Summary stats ── #}
+      {% set submitted  = sessions|selectattr('submitted_at')|list %}
+      {% set cheaters   = sessions|selectattr('flags','gt',0)|list %}
+      {% set id_flagged = sessions|selectattr('id_fail_count')|selectattr('id_fail_count','gt',0)|list %}
+      {% set locked_s   = sessions|selectattr('locked')|list %}
+      <div class="summary-grid">
+        <div class="stat-card s-blue"><div class="stat-label">Participants</div><div class="stat-value">{{ sessions|length }}</div></div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Submitted</div>
+          <div class="stat-value" style="color:var(--green)">{{ submitted|length }}</div>
+        </div>
+        <div class="stat-card s-amber">
+          <div class="stat-label">Proctor Flags</div>
+          <div class="stat-value" style="color:var(--amber)">{{ cheaters|length }}</div>
+        </div>
+        <div class="stat-card s-red">
+          <div class="stat-label">Locked</div>
+          <div class="stat-value" style="color:var(--red)">{{ locked_s|length }}</div>
+        </div>
+        {% if exam.face_verify_enabled %}
+        <div class="stat-card" style="border-color:rgba(167,139,250,.3);">
+          <div class="stat-label">ID Mismatches</div>
+          <div class="stat-value" style="color:#a78bfa">{{ id_flagged|length }}</div>
+        </div>
+        {% endif %}
+        {% if submitted %}
+        <div class="stat-card s-blue">
+          <div class="stat-label">Avg Score</div>
+          <div class="stat-value">
+            {% set ns = namespace(total=0,cnt=0) %}
+            {% for s in submitted %}{% if s.score is not none %}{% set ns.total=ns.total+s.score %}{% set ns.cnt=ns.cnt+1 %}{% endif %}{% endfor %}
+            {% if ns.cnt %}{{ "%.1f"|format(ns.total/ns.cnt) }}{% else %}—{% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {# ── Student results table ── #}
+      <div class="section-head">📋 Student Results</div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th><th>Email</th><th>Score</th>
+                <th>Attn</th><th>Max Sus</th>
+                <th>Flags</th>
+                {% if exam.face_verify_enabled %}<th>ID Fails</th>{% endif %}
+                <th>Status</th><th>Lock Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in sessions %}
+              <tr {% if s.flags>0 or s.id_fail_count>0 %}class="cheat-row"{% endif %}>
+                <td style="font-weight:600;color:var(--text0);">{{ s.student_name }}</td>
+                <td style="font-size:.72rem;color:var(--text3);">{{ s.student_email }}</td>
+                <td>
+                  {% if s.score is not none and s.max_score %}
+                    {% set pct=(s.score/s.max_score*100)|int %}
+                    <span style="color:{% if pct>=70 %}var(--green){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %};font-weight:700;">
+                      {{ s.score|int }}/{{ s.max_score|int }}</span>
+                    <span style="font-size:.68rem;color:var(--text3);"> ({{ pct }}%)</span>
+                  {% else %}<span style="color:var(--text3);">—</span>{% endif %}
+                </td>
+                <td>
+                  {% set att=s.attention_avg %}
+                  <span style="color:{% if att>60 %}var(--green){% elif att>35 %}var(--amber){% else %}var(--red){% endif %}">
+                    {{ "%.0f"|format(att) }}%</span>
+                </td>
+                <td>
+                  {% set sus=s.suspicion_max %}
+                  <span style="color:{% if sus<40 %}var(--green){% elif sus<70 %}var(--amber){% else %}var(--red){% endif %}">
+                    {{ "%.0f"|format(sus) }}%</span>
+                </td>
+                <td>
+                  {% if s.flags>0 %}<span class="badge badge-red">⚠ {{ s.flags }}</span>
+                  {% else %}<span style="color:var(--text3);">0</span>{% endif %}
+                </td>
+                {% if exam.face_verify_enabled %}
+                <td>
+                  {% if s.id_fail_count>0 %}
+                    <span class="id-fail-badge" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3);">
+                      {{ s.id_fail_count }}×</span>
+                  {% else %}<span style="color:var(--green);font-size:.75rem;">✓</span>{% endif %}
+                </td>
+                {% endif %}
+                <td>
+                  {% if s.status=='submitted' %}<span class="badge badge-green">Submitted</span>
+                  {% elif s.status=='locked' %}<span class="badge badge-red">Locked</span>
+                  {% elif s.status=='active' %}<span class="badge badge-blue"><span class="live-dot"></span>Active</span>
+                  {% else %}<span class="badge badge-gray">{{ s.status }}</span>{% endif %}
+                </td>
+                <td style="font-size:.72rem;color:var(--red);">
+                  {{ s.lock_reason|truncate(40) if s.locked else '—' }}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px;">No students yet</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {# ── Per-student timeline ── #}
+      {% if sessions %}
+      <div class="section-head">👤 Per-Student Event Timeline</div>
+      {% for s in sessions %}
+        {% set s_events = events|selectattr('session_id','eq',s.id)|list %}
+        {% if s_events or s.flags>0 or s.id_fail_count>0 %}
+        <div class="per-student-card">
+          <div class="psc-head">
+            <div>
+              <div class="psc-name">{{ s.student_name }}</div>
+              <div class="psc-email">{{ s.student_email }}</div>
+            </div>
+            <div class="psc-metrics">
+              {% if s.score is not none and s.max_score %}
+              <span class="pm">{{ s.score|int }}/{{ s.max_score|int }}</span>
+              {% endif %}
+              <span class="pm" style="color:{% if s.attention_avg>60 %}var(--green){% else %}var(--amber){% endif %}">
+                Attn {{ "%.0f"|format(s.attention_avg) }}%</span>
+              {% if s.flags>0 %}
+              <span class="pm" style="color:var(--red);">⚠ {{ s.flags }} flags</span>{% endif %}
+              {% if s.id_fail_count>0 %}
+              <span class="pm" style="color:#a78bfa;">🪪 {{ s.id_fail_count }} ID fails</span>{% endif %}
+            </div>
+          </div>
+          <div class="timeline">
+            {% for ev in s_events %}
+            <div class="tl-item {% if 'lock' in ev.event_type %}tl-lock{% elif 'identity' in ev.event_type %}tl-id{% elif ev.suspicion>70 %}tl-warn{% endif %}">
+              <span class="tl-time">{{ ev.timestamp[11:19] }}</span>
+              <span class="tl-msg">
+                <span class="ev-chip
+                  {% if 'lock' in ev.event_type %}ev-lock
+                  {% elif 'identity' in ev.event_type %}ev-id
+                  {% elif 'eye' in ev.event_type or 'face' in ev.event_type %}ev-eye
+                  {% elif 'object' in ev.event_type %}ev-obj
+                  {% else %}ev-other{% endif %}">
+                  {{ ev.event_type }}
+                </span>
+                ATT:{{ ev.attention|int }}% SUS:{{ ev.suspicion|int }}%
+                {% if ev.snapshot %} · <a href="/snapshot/{{ ev.snapshot }}" target="_blank" style="color:var(--accent);font-size:.7rem;">📷 snap</a>{% endif %}
+              </span>
+            </div>
+            {% endfor %}
+            {% if not s_events %}
+            <div class="tl-item"><span class="tl-msg" style="color:var(--text3);">No events logged.</span></div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% endif %}
+
+      {# ── All events table ── #}
+      <div class="section-head">🚨 All Proctor Events ({{ events|length }})</div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Student</th><th>Event</th><th>Attn</th><th>Sus</th><th>Snapshot</th></tr>
+            </thead>
+            <tbody>
+              {% for ev in events[:200] %}
+              <tr>
+                <td style="font-size:.7rem;color:var(--text3);white-space:nowrap;">{{ ev.timestamp[:19] }}</td>
+                <td style="font-weight:500;font-size:.82rem;">{{ ev.student_name }}</td>
+                <td>
+                  <span class="ev-chip
+                    {% if 'lock' in ev.event_type %}ev-lock
+                    {% elif 'identity' in ev.event_type %}ev-id
+                    {% elif 'eye' in ev.event_type or 'face' in ev.event_type %}ev-eye
+                    {% elif 'object' in ev.event_type %}ev-obj
+                    {% else %}ev-other{% endif %}">
+                    {{ ev.event_type }}
+                  </span>
+                </td>
+                <td><span style="color:{% if ev.attention>60 %}var(--green){% elif ev.attention>35 %}var(--amber){% else %}var(--red){% endif %};font-size:.8rem;">{{ ev.attention|int }}%</span></td>
+                <td><span style="color:{% if ev.suspicion<40 %}var(--green){% elif ev.suspicion<70 %}var(--amber){% else %}var(--red){% endif %};font-size:.8rem;">{{ ev.suspicion|int }}%</span></td>
+                <td>{% if ev.snapshot %}<a href="/snapshot/{{ ev.snapshot }}" target="_blank" style="color:var(--accent);font-size:.72rem;">📷 View</a>{% else %}—{% endif %}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">No events</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

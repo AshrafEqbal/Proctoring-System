@@ -1,0 +1,634 @@
+{% extends "base.html" %}
+{% block title %}Edit Exam — ProctorVault{% endblock %}
+
+{% block head %}
+<!-- MathJax preview for teacher -->
+<script>window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},startup:{typeset:false}};</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js" crossorigin="anonymous"></script>
+<style>
+/* ─ Share bar ─ */
+.code-share{font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--accent);
+  letter-spacing:.15em;background:var(--bg3);padding:12px 20px;border-radius:10px;
+  border:2px dashed var(--border2);text-align:center;margin:10px 0;}
+
+/* ─ Tab system ─ */
+.tab-btns{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.tab-btn{padding:10px 18px;font-size:.83rem;font-weight:500;color:var(--text2);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;
+  background:none;border-top:none;border-left:none;border-right:none;font-family:var(--font);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+
+/* ─ Question card (display) ─ */
+.q-card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:10px;transition:border-color .2s;}
+.q-card:hover{border-color:var(--border2);}
+.q-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.q-card-num{font-size:.68rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+.q-preview-content{font-size:.88rem;color:var(--text1);line-height:1.6;}
+.q-preview-img{max-height:80px;border-radius:6px;border:1px solid var(--border);margin-top:6px;object-fit:contain;}
+.opt-preview{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
+.op-row{display:flex;align-items:center;gap:8px;font-size:.78rem;}
+.op-badge{min-width:26px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;}
+.op-correct{background:rgba(34,211,160,.15);color:var(--green);border:1px solid rgba(34,211,160,.3);}
+.op-normal{background:var(--bg4);color:var(--text3);border:1px solid var(--border);}
+
+/* ─ Question builder ─ */
+.builder{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:22px;}
+.builder-title{font-size:.88rem;font-weight:700;color:var(--text0);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.block-editor{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;min-height:60px;background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:10px;}
+.block-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;}
+.block-item .bi-type{font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0;text-transform:uppercase;letter-spacing:.05em;}
+.type-text{background:rgba(79,142,247,.15);color:var(--accent);}
+.type-latex{background:rgba(167,139,250,.15);color:#a78bfa;}
+.type-image{background:rgba(34,211,160,.15);color:var(--green);}
+.block-item .bi-val{flex:1;font-size:.82rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.block-item .bi-rm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:.85rem;padding:2px 5px;border-radius:4px;}
+.block-item .bi-rm:hover{color:var(--red);background:rgba(240,90,90,.1);}
+.block-add-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.ba-btn{padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid;transition:all .15s;font-family:var(--font);}
+.ba-text{background:rgba(79,142,247,.1);color:var(--accent);border-color:rgba(79,142,247,.3);}
+.ba-text:hover{background:rgba(79,142,247,.2);}
+.ba-latex{background:rgba(167,139,250,.1);color:#a78bfa;border-color:rgba(167,139,250,.3);}
+.ba-latex:hover{background:rgba(167,139,250,.2);}
+.ba-img{background:rgba(34,211,160,.1);color:var(--green);border-color:rgba(34,211,160,.3);}
+.ba-img:hover{background:rgba(34,211,160,.2);}
+
+/* Option builder row */
+.opt-builder{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.ob-row{display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);}
+.ob-row.correct{border-color:rgba(34,211,160,.4);background:rgba(34,211,160,.04);}
+.ob-letter{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--text3);border:2px solid var(--border2);flex-shrink:0;margin-top:4px;}
+.ob-row.correct .ob-letter{background:var(--green2);border-color:var(--green2);color:#fff;}
+.ob-main{flex:1;min-width:0;}
+.ob-text-inp{width:100%;background:var(--bg1);border:1px solid var(--border);color:var(--text0);padding:8px 10px;border-radius:8px;font-size:.85rem;font-family:var(--font);outline:none;transition:border .2s;margin-bottom:6px;}
+.ob-text-inp:focus{border-color:var(--accent);}
+.ob-type-sel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.ob-ts-btn{padding:4px 10px;border-radius:6px;font-size:.7rem;font-weight:600;cursor:pointer;border:1px solid;transition:all .15s;font-family:var(--font);}
+.ob-sel-text{background:rgba(79,142,247,.1);color:var(--accent);border-color:rgba(79,142,247,.3);}
+.ob-sel-latex{background:rgba(167,139,250,.1);color:#a78bfa;border-color:rgba(167,139,250,.3);}
+.ob-sel-img{background:rgba(34,211,160,.1);color:var(--green);border-color:rgba(34,211,160,.3);}
+.ob-img-prev{max-height:60px;border-radius:6px;border:1px solid var(--border);margin-top:4px;display:none;}
+.ob-correct-chk{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--text2);margin-top:4px;cursor:pointer;}
+.ob-correct-chk input{width:14px;height:14px;accent-color:var(--green2);}
+
+/* Inline input popup */
+.inline-inp-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px;display:none;}
+.inline-inp-wrap.show{display:block;}
+.inline-inp{width:100%;background:transparent;border:none;color:var(--text0);font-size:.85rem;font-family:var(--mono);outline:none;resize:vertical;min-height:44px;}
+.inline-hint{font-size:.68rem;color:var(--text3);margin-top:4px;}
+.latex-preview{font-size:.85rem;color:var(--text0);margin-top:6px;padding:6px 10px;background:var(--bg3);border-radius:6px;min-height:32px;}
+
+/* Face verify section */
+.fv-section{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:16px;}
+.fv-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.fv-title{font-size:.88rem;font-weight:700;color:var(--text0);}
+.toggle-wrap{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--text2);}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;border-radius:999px;background:var(--bg4);cursor:pointer;transition:background .2s;}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;top:3px;left:3px;border-radius:50%;background:var(--text3);transition:transform .2s,background .2s;}
+.toggle input:checked+.toggle-slider{background:var(--green2);}
+.toggle input:checked+.toggle-slider::before{transform:translateX(18px);background:#fff;}
+.fv-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fv-fields.hidden{display:none;}
+.thresh-preview{font-size:.72rem;color:var(--text3);margin-top:3px;}
+mjx-container{color:var(--text0) !important;}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Teacher</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/teacher"><span class="icon">📋</span>My Exams</a>
+      <a class="nav-item active" href="#"><span class="icon">✏️</span>Edit Exam</a>
+      <a class="nav-item" href="/teacher/exam/{{ exam.id }}/roster"><span class="icon">👥</span>Roster</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">{{ user.role }}</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div><h2>{{ exam.title }}</h2><div class="breadcrumb"><a href="/teacher">My Exams</a> → Edit</div></div>
+      <div style="display:flex;gap:8px;">
+        <a href="/teacher/exam/{{ exam.id }}/roster"  class="btn btn-ghost btn-sm">👥 Roster</a>
+        <a href="/teacher/exam/{{ exam.id }}/monitor" class="btn btn-ghost btn-sm">👁 Monitor</a>
+        <a href="/teacher/exam/{{ exam.id }}/report"  class="btn btn-ghost btn-sm">📊 Report</a>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- Share banner -->
+      <div class="card" style="margin-bottom:20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:.72rem;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Exam Code</div>
+          <div class="code-share">{{ exam.exam_code }}</div>
+        </div>
+        <div style="flex:2;min-width:200px;">
+          <div style="font-size:.72rem;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Student Join Link</div>
+          <div style="font-size:.82rem;color:var(--text2);word-break:break-all;" id="join-url-display">{{ request.host_url }}join</div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="copyLink()">📋 Copy Link</button>
+            <span class="badge badge-{% if exam.status=='active' %}green{% elif exam.status=='draft' %}gray{% else %}red{% endif %}">
+              {% if exam.face_verify_enabled %}🪪 ID Verify · {% endif %}{{ exam.status|capitalize }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-btns">
+        <button class="tab-btn active" id="tbtq" onclick="switchTab('questions',this)">
+          Questions <span style="color:var(--text3);font-size:.75rem;">({{ questions|length }})</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('settings',this)">Settings & Security</button>
+      </div>
+
+      <!-- ═══════════ QUESTIONS TAB ═══════════ -->
+      <div class="tab-pane active" id="tab-questions">
+
+        <!-- Existing questions list -->
+        <div id="q-list" style="margin-bottom:20px;">
+          {% if not questions %}
+          <div style="text-align:center;padding:32px;color:var(--text3);background:var(--bg2);border:1px dashed var(--border);border-radius:12px;">
+            <div style="font-size:2rem;margin-bottom:8px;">📝</div>
+            <p>No questions yet. Add your first question below.</p>
+          </div>
+          {% endif %}
+          {% for q in questions %}
+          <div class="q-card" id="qcard-{{ q.id }}">
+            <div class="q-card-head">
+              <div style="flex:1;min-width:0;">
+                <div class="q-card-num">Q{{ loop.index }} · {{ q.points }} pt{% if q.points>1 %}s{% endif %}</div>
+                {% set cp = q.content %}
+                {% if cp %}
+                  {% set cpd = cp|tojson %}
+                  <div class="q-preview-content" id="qprev-{{ q.id }}">Loading…</div>
+                {% endif %}
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0;">
+                <button class="btn btn-ghost btn-sm" onclick="startEdit({{ q.id }})">✏️ Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteQ({{ q.id }})">🗑️</button>
+              </div>
+            </div>
+            <!-- Options preview -->
+            <div class="opt-preview" id="optprev-{{ q.id }}">
+              {% set opts = q.options %}
+              {% if opts %}
+                {% set opts_parsed = opts %}
+              {% endif %}
+            </div>
+            <!-- Hidden data for JS -->
+            <script>
+            (function(){
+              const id={{ q.id }};
+              try{
+                const cp=JSON.parse({{ q.content|tojson }});
+                const blocks=cp.blocks||[];
+                const el=document.getElementById('qprev-'+id);
+                if(el){
+                  const text=blocks.filter(b=>b.type==='text').map(b=>b.value).join(' ');
+                  const hasLatex=blocks.some(b=>b.type==='latex');
+                  const hasImg=blocks.some(b=>b.type==='image');
+                  el.textContent=text.slice(0,120)+(text.length>120?'…':'');
+                  if(hasLatex) el.innerHTML+=' <span style="font-size:.7rem;color:#a78bfa;background:rgba(167,139,250,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(167,139,250,.2);">∑ LaTeX</span>';
+                  if(hasImg)   el.innerHTML+=' <span style="font-size:.7rem;color:var(--green);background:rgba(34,211,160,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(34,211,160,.2);">🖼 Image</span>';
+                }
+              }catch(e){}
+              try{
+                const opts=JSON.parse({{ q.options|tojson }});
+                const letters=['A','B','C','D','E'];
+                const opEl=document.getElementById('optprev-'+id);
+                if(opEl){
+                  opEl.innerHTML='';
+                  opts.forEach((o,i)=>{
+                    const row=document.createElement('div');
+                    row.className='op-row';
+                    const badge=document.createElement('span');
+                    badge.className='op-badge '+(i==={{ q.correct_idx }}?'op-correct':'op-normal');
+                    badge.textContent=letters[i]+(i==={{ q.correct_idx }}?' ✓':'');
+                    const val=document.createElement('span');
+                    val.style.color='var(--text'+(i==={{ q.correct_idx }}?'0':'2')+')';
+                    val.textContent=(typeof o==='object'?(o.value||''):(o||'')).slice(0,60);
+                    row.appendChild(badge); row.appendChild(val);
+                    opEl.appendChild(row);
+                  });
+                }
+              }catch(e){}
+            })();
+            </script>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- ───────── Add / Edit question builder ───────── -->
+        <div class="builder" id="q-builder">
+          <div class="builder-title">
+            <span id="builder-icon">➕</span>
+            <span id="builder-title-txt">Add New Question</span>
+            <button class="btn btn-ghost btn-sm" id="builder-cancel-btn" style="display:none;margin-left:auto;" onclick="cancelEdit()">Cancel</button>
+          </div>
+
+          <!-- Question content blocks -->
+          <label class="form-label">Question Content</label>
+          <div class="block-editor" id="q-blocks-editor"></div>
+          <div class="block-add-row">
+            <button class="ba-btn ba-text"  onclick="addBlock('text')">＋ Text</button>
+            <button class="ba-btn ba-latex" onclick="addBlock('latex')">＋ Equation (LaTeX)</button>
+            <button class="ba-btn ba-img"   onclick="addBlock('image')">＋ Image</button>
+          </div>
+          <!-- Inline text/latex input area -->
+          <div class="inline-inp-wrap" id="block-inp-area">
+            <textarea class="inline-inp" id="block-inp-val" placeholder="Type here…" rows="2"></textarea>
+            <div class="inline-hint" id="block-inp-hint"></div>
+            <div class="latex-preview" id="latex-prev" style="display:none;"></div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <button class="btn btn-primary btn-sm" onclick="confirmBlock()">Add ✓</button>
+              <button class="btn btn-ghost btn-sm" onclick="cancelBlock()">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <label class="form-label" style="margin-top:18px;">Answer Options</label>
+          <div class="opt-builder" id="opt-builder">
+            <!-- A B C D generated by JS -->
+          </div>
+
+          <!-- Points + submit -->
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label class="form-label" style="margin:0;white-space:nowrap;">Points:</label>
+              <input class="form-input" type="number" id="q-points" value="1" min="1" max="20" style="width:70px;">
+            </div>
+            <button class="btn btn-primary" id="builder-submit-btn" onclick="submitQuestion()">Add Question →</button>
+          </div>
+        </div>
+
+      </div><!-- /tab-questions -->
+
+      <!-- ═══════════ SETTINGS TAB ═══════════ -->
+      <div class="tab-pane" id="tab-settings">
+        <div class="card" style="max-width:640px;">
+          <form method="POST">
+            <div class="form-group"><label class="form-label">Title</label><input class="form-input" name="title" value="{{ exam.title }}" required></div>
+            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" name="description">{{ exam.description or '' }}</textarea></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Duration (min)</label><input class="form-input" type="number" name="duration" value="{{ exam.duration_mins }}" min="5" max="360"></div>
+              <div class="form-group"><label class="form-label">Status</label>
+                <select class="form-select" name="status">
+                  <option value="draft" {% if exam.status=='draft' %}selected{% endif %}>Draft</option>
+                  <option value="active" {% if exam.status=='active' %}selected{% endif %}>Active</option>
+                  <option value="closed" {% if exam.status=='closed' %}selected{% endif %}>Closed</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Starts At</label><input class="form-input" type="datetime-local" name="starts_at" value="{{ exam.starts_at or '' }}"></div>
+              <div class="form-group"><label class="form-label">Ends At</label><input class="form-input" type="datetime-local" name="ends_at" value="{{ exam.ends_at or '' }}"></div>
+            </div>
+
+            <!-- Face verification section -->
+            <div class="fv-section">
+              <div class="fv-header">
+                <div>
+                  <div class="fv-title">🪪 Face Identity Verification</div>
+                  <div style="font-size:.75rem;color:var(--text3);margin-top:3px;">Students must submit a photo before the exam. Identity is verified continuously during the session.</div>
+                </div>
+                <div class="toggle-wrap">
+                  <span>Enable</span>
+                  <label class="toggle">
+                    <input type="checkbox" name="face_verify" id="fv-toggle" {% if exam.face_verify_enabled %}checked{% endif %}
+                           onchange="document.getElementById('fv-fields').classList.toggle('hidden',!this.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="fv-fields {% if not exam.face_verify_enabled %}hidden{% endif %}" id="fv-fields">
+                <div class="form-group">
+                  <label class="form-label">Match Threshold (0.5 – 0.95)</label>
+                  <input class="form-input" type="range" name="face_thresh" id="fv-thresh"
+                         min="0.5" max="0.95" step="0.01"
+                         value="{{ exam.face_verify_thresh or 0.72 }}"
+                         oninput="document.getElementById('fv-thresh-val').textContent=(+this.value*100).toFixed(0)+'% — '+(+this.value>=0.85?'Strict':+this.value>=0.72?'Balanced':'Lenient')"
+                         style="padding:6px 0;">
+                  <div class="thresh-preview" id="fv-thresh-val">
+                    {{ ((exam.face_verify_thresh or 0.72)*100)|int }}% —
+                    {% if (exam.face_verify_thresh or 0.72) >= 0.85 %}Strict
+                    {% elif (exam.face_verify_thresh or 0.72) >= 0.72 %}Balanced
+                    {% else %}Lenient{% endif %}
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Consecutive Fails Before Lock</label>
+                  <input class="form-input" type="number" name="face_fail_limit"
+                         value="{{ exam.face_fail_limit or 3 }}" min="1" max="10">
+                  <div style="font-size:.72rem;color:var(--text3);margin-top:3px;">How many verification failures in a row trigger an auto-lock.</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border);margin-top:16px;">
+              <button class="btn btn-primary" type="submit">Save Settings</button>
+            </div>
+          </form>
+        </div>
+      </div><!-- /tab-settings -->
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EXAM_ID = "{{ exam.id }}";
+
+// ── Tab switch ────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let qBlocks      = [];          // [{type, value}]
+let optData      = [            // one per option A-D
+  {type:'text',value:'',image:'',correct:false},
+  {type:'text',value:'',image:'',correct:false},
+  {type:'text',value:'',image:'',correct:false},
+  {type:'text',value:'',image:'',correct:false},
+];
+let pendingBlockType = null;
+let editingQid       = null;    // null = add mode
+
+// ── Block editor ──────────────────────────────────────────────────────────
+function renderBlockEditor() {
+  const el = document.getElementById('q-blocks-editor');
+  el.innerHTML = '';
+  if (!qBlocks.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:.8rem;padding:8px 4px;">No content blocks yet. Add text, equations, or images below.</div>';
+    return;
+  }
+  qBlocks.forEach((b, i) => {
+    const div = document.createElement('div');
+    div.className = 'block-item';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = `bi-type type-${b.type}`;
+    typeBadge.textContent = b.type==='latex' ? '∑ eq' : b.type==='image' ? '🖼' : 'Aa';
+    const valSpan = document.createElement('span');
+    valSpan.className = 'bi-val';
+    valSpan.textContent = b.type==='image' ? b.value : b.value.slice(0,80);
+    const rm = document.createElement('button');
+    rm.className = 'bi-rm'; rm.textContent = '✕';
+    rm.onclick = () => { qBlocks.splice(i,1); renderBlockEditor(); };
+    div.appendChild(typeBadge); div.appendChild(valSpan); div.appendChild(rm);
+    el.appendChild(div);
+  });
+}
+
+function addBlock(type) {
+  pendingBlockType = type;
+  const area = document.getElementById('block-inp-area');
+  const inp  = document.getElementById('block-inp-val');
+  const hint = document.getElementById('block-inp-hint');
+  const latexPrev = document.getElementById('latex-prev');
+
+  if (type === 'image') {
+    // file picker
+    const fi = document.createElement('input');
+    fi.type='file'; fi.accept='image/*';
+    fi.onchange = async e => {
+      const f = e.target.files[0]; if(!f) return;
+      const fd = new FormData(); fd.append('image', f);
+      const res = await fetch('/api/upload_image',{method:'POST',body:fd});
+      const d   = await res.json();
+      if (d.ok) {
+        qBlocks.push({type:'image', value:d.url});
+        renderBlockEditor();
+        toast('Image uploaded ✓');
+      } else { toast('Upload failed: '+d.error); }
+    };
+    fi.click(); return;
+  }
+
+  area.classList.add('show');
+  inp.value = '';
+  latexPrev.style.display = type==='latex' ? 'block' : 'none';
+  latexPrev.innerHTML = '';
+  if (type==='text') {
+    inp.placeholder = 'Type your question text…';
+    hint.textContent = 'Plain text. Use multiple text blocks for paragraphs.';
+  } else {
+    inp.placeholder = 'e.g.  \\frac{a}{b} + x^2 = 0';
+    hint.textContent = 'LaTeX math. No need to wrap with $…$ — it is done automatically.';
+  }
+  inp.focus();
+  inp.oninput = () => {
+    if (type==='latex' && window.MathJax) {
+      latexPrev.innerHTML = `$$${inp.value}$$`;
+      MathJax.typesetPromise([latexPrev]).catch(()=>{});
+    }
+  };
+}
+
+function confirmBlock() {
+  const val = document.getElementById('block-inp-val').value.trim();
+  if (!val) { toast('Enter some content first'); return; }
+  qBlocks.push({type: pendingBlockType, value: val});
+  renderBlockEditor();
+  cancelBlock();
+}
+function cancelBlock() {
+  document.getElementById('block-inp-area').classList.remove('show');
+  document.getElementById('block-inp-val').value = '';
+  pendingBlockType = null;
+}
+
+// ── Option builder ────────────────────────────────────────────────────────
+const LETTERS = ['A','B','C','D'];
+
+function renderOptBuilder() {
+  const wrap = document.getElementById('opt-builder');
+  wrap.innerHTML = '';
+  optData.forEach((opt, i) => {
+    const row = document.createElement('div');
+    row.className = 'ob-row' + (opt.correct?' correct':'');
+    row.id = `ob-${i}`;
+
+    const letter = document.createElement('div');
+    letter.className = 'ob-letter';
+    letter.textContent = LETTERS[i];
+
+    const main = document.createElement('div');
+    main.className = 'ob-main';
+
+    // Type selector
+    const typeRow = document.createElement('div');
+    typeRow.className = 'ob-type-sel';
+    ['text','latex'].forEach(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `ob-ts-btn ob-sel-${t}`;
+      btn.textContent = t==='text' ? 'Aa Text' : '∑ LaTeX';
+      btn.style.fontWeight = opt.type===t ? '800' : '500';
+      btn.style.opacity    = opt.type===t ? '1' : '.5';
+      btn.onclick = () => { optData[i].type=t; renderOptBuilder(); };
+      typeRow.appendChild(btn);
+    });
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'ob-text-inp';
+    inp.value = opt.value;
+    inp.placeholder = opt.type==='latex' ? 'e.g.  x^2 + y^2 = r^2' : `Option ${LETTERS[i]}`;
+    inp.oninput = () => { optData[i].value = inp.value; };
+
+    // Image upload for option
+    const imgWrap = document.createElement('div');
+    imgWrap.style.display = 'flex'; imgWrap.style.gap = '6px'; imgWrap.style.flexWrap='wrap';
+    const imgBtn = document.createElement('button');
+    imgBtn.type='button'; imgBtn.className='ob-ts-btn ob-sel-img';
+    imgBtn.textContent = opt.image ? '🖼 Change Image' : '🖼 Add Image';
+    imgBtn.onclick = () => {
+      const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*';
+      fi.onchange = async e => {
+        const f=e.target.files[0]; if(!f) return;
+        const fd=new FormData(); fd.append('image',f);
+        const res=await fetch('/api/upload_image',{method:'POST',body:fd});
+        const d=await res.json();
+        if(d.ok){ optData[i].image=d.url; renderOptBuilder(); toast('Image added'); }
+      };
+      fi.click();
+    };
+    if (opt.image) {
+      const rmBtn=document.createElement('button');
+      rmBtn.type='button'; rmBtn.className='ob-ts-btn';
+      rmBtn.style.cssText='background:rgba(240,90,90,.1);color:var(--red);border-color:rgba(240,90,90,.3);';
+      rmBtn.textContent='✕ Remove';
+      rmBtn.onclick=()=>{ optData[i].image=''; renderOptBuilder(); };
+      imgWrap.appendChild(imgBtn); imgWrap.appendChild(rmBtn);
+    } else { imgWrap.appendChild(imgBtn); }
+
+    // Correct answer checkbox
+    const correctRow = document.createElement('label');
+    correctRow.className = 'ob-correct-chk';
+    const chk = document.createElement('input');
+    chk.type='checkbox'; chk.checked = opt.correct;
+    chk.onchange = () => {
+      // allow only one correct answer
+      optData.forEach((o,j) => o.correct = (j===i && chk.checked));
+      renderOptBuilder();
+    };
+    correctRow.appendChild(chk);
+    correctRow.appendChild(document.createTextNode(' Mark as correct answer'));
+
+    main.appendChild(typeRow);
+    main.appendChild(inp);
+    if (opt.image) {
+      const prevImg = document.createElement('img');
+      prevImg.src=opt.image; prevImg.className='ob-img-prev'; prevImg.style.display='block';
+      main.appendChild(prevImg);
+    }
+    main.appendChild(imgWrap);
+    main.appendChild(correctRow);
+    row.appendChild(letter); row.appendChild(main);
+    wrap.appendChild(row);
+  });
+}
+
+// ── Submit question ───────────────────────────────────────────────────────
+async function submitQuestion() {
+  if (!qBlocks.length) { toast('Add at least one content block'); return; }
+  const filled = optData.filter(o => o.value.trim());
+  if (filled.length < 2) { toast('Add at least 2 options'); return; }
+  const correctIdx = optData.findIndex(o => o.correct);
+  if (correctIdx < 0) { toast('Mark the correct answer'); return; }
+
+  const content   = {blocks: qBlocks};
+  const options   = optData.map(o => ({type:o.type, value:o.value, image:o.image||''}));
+  const points    = parseInt(document.getElementById('q-points').value) || 1;
+  const orderIdx  = document.querySelectorAll('.q-card').length;
+
+  let url = '/api/questions', method = 'POST';
+  let body = JSON.stringify({exam_id:EXAM_ID, content, options, correct_idx:correctIdx, points, order_idx: editingQid ? undefined : orderIdx});
+  if (editingQid) {
+    url = `/api/questions/${editingQid}`; method='PUT';
+    body = JSON.stringify({content, options, correct_idx:correctIdx, points});
+  }
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body});
+  const d   = await res.json();
+  if (d.ok) { toast(editingQid ? '✓ Question updated' : '✓ Question added'); location.reload(); }
+  else       { toast('Error saving question'); }
+}
+
+// ── Edit / delete ─────────────────────────────────────────────────────────
+async function startEdit(qid) {
+  const res = await fetch(`/api/questions/${qid}`);
+  const d   = await res.json();
+  if (!d.ok) { toast('Could not load question data'); return; }
+  const q = d.question;
+
+  // Populate blocks from content_parsed
+  qBlocks = [];
+  const cp = q.content_parsed || {};
+  (cp.blocks || []).forEach(b => qBlocks.push({type:b.type, value:b.value}));
+
+  // Populate options
+  const ops = q.options_parsed || [];
+  optData = [0,1,2,3].map(i => {
+    const o = ops[i] || {};
+    return {
+      type:    o.type || 'text',
+      value:   o.value || '',
+      image:   o.image || '',
+      correct: i === q.correct_idx,
+    };
+  });
+
+  document.getElementById('q-points').value = q.points || 1;
+  renderBlockEditor();
+  renderOptBuilder();
+
+  editingQid = qid;
+  document.getElementById('builder-icon').textContent='✏️';
+  document.getElementById('builder-title-txt').textContent = `Editing Question (ID ${qid})`;
+  document.getElementById('builder-cancel-btn').style.display='';
+  document.getElementById('builder-submit-btn').textContent='Save Changes ✓';
+  document.getElementById('q-builder').scrollIntoView({behavior:'smooth'});
+  toast('Edit mode loaded — modify and click Save Changes');
+}
+
+function cancelEdit() {
+  editingQid = null;
+  qBlocks = []; optData=[{type:'text',value:'',image:'',correct:false},{type:'text',value:'',image:'',correct:false},{type:'text',value:'',image:'',correct:false},{type:'text',value:'',image:'',correct:false}];
+  renderBlockEditor(); renderOptBuilder();
+  document.getElementById('builder-icon').textContent='➕';
+  document.getElementById('builder-title-txt').textContent='Add New Question';
+  document.getElementById('builder-cancel-btn').style.display='none';
+  document.getElementById('builder-submit-btn').textContent='Add Question →';
+}
+
+async function deleteQ(qid) {
+  if (!confirm('Delete this question?')) return;
+  const res = await fetch('/api/questions/'+qid, {method:'DELETE'});
+  const d   = await res.json();
+  if (d.ok) { document.getElementById('qcard-'+qid)?.remove(); toast('Deleted'); }
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(window.location.origin+'/join')
+    .then(()=>toast('Join URL copied!'));
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+renderBlockEditor();
+renderOptBuilder();
+</script>
+{% endblock %}

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exam Result — ProctorVault</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#07090f;--bg1:#0d1117;--bg2:#141924;--bg3:#1c2333;--border:#2a3550;
+  --text0:#f0f4ff;--text1:#c8d3f0;--text2:#7b8db8;--text3:#4a5578;
+  --accent:#4f8ef7;--green:#22d3a0;--red:#f05a5a;--amber:#f0a030;
+  --font:'DM Sans',sans-serif;--mono:'Space Mono',monospace;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg0);color:var(--text1);
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;
+  padding:36px;width:500px;max-width:100%;text-align:center;
+  box-shadow:0 30px 80px rgba(0,0,0,.5);animation:rise .4s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.result-icon{font-size:3.5rem;margin-bottom:12px;}
+.result-title{font-size:1.5rem;font-weight:700;color:var(--text0);margin-bottom:6px;}
+.result-sub{font-size:.85rem;color:var(--text3);margin-bottom:28px;}
+.score-circle{
+  width:116px;height:116px;border-radius:50%;
+  border:6px solid;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;margin:0 auto 24px;
+  position:relative;
+}
+.score-num{font-family:var(--mono);font-size:1.65rem;font-weight:700;line-height:1;}
+.score-lbl{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;}
+.info-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;text-align:left;}
+.ir{display:flex;justify-content:space-between;align-items:center;
+  padding:9px 13px;background:var(--bg3);border-radius:8px;gap:10px;}
+.ir-label{font-size:.8rem;color:var(--text2);flex-shrink:0;}
+.ir-val{font-size:.82rem;color:var(--text0);font-weight:500;text-align:right;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;
+  border-radius:999px;font-size:.74rem;font-weight:600;}
+.badge-red{background:rgba(240,90,90,.12);color:var(--red);border:1px solid rgba(240,90,90,.3);}
+.badge-green{background:rgba(34,211,160,.12);color:var(--green);border:1px solid rgba(34,211,160,.3);}
+.badge-amber{background:rgba(240,160,48,.12);color:var(--amber);border:1px solid rgba(240,160,48,.3);}
+.badge-purple{background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3);}
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:11px 24px;
+  background:var(--accent);color:#fff;border:none;border-radius:10px;
+  font-size:.9rem;font-weight:600;cursor:pointer;text-decoration:none;font-family:var(--font);}
+.btn:hover{opacity:.9;}
+.proctor-summary{background:var(--bg1);border-radius:12px;padding:14px 16px;
+  margin-bottom:16px;text-align:left;border:1px solid var(--border);}
+.ps-title{font-size:.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;
+  letter-spacing:.07em;margin-bottom:10px;}
+.ps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ps-item{background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 11px;}
+.ps-val{font-size:.95rem;font-weight:700;margin-bottom:2px;}
+.ps-lbl{font-size:.68rem;color:var(--text3);}
+</style>
+</head>
+<body>
+<div class="card">
+  {% if session.submitted_at %}
+    {% set pct = (session.score / session.max_score * 100)|int if session.max_score else 0 %}
+
+    <div class="result-icon">
+      {% if session.locked %}🔒
+      {% elif pct >= 70 %}🎉
+      {% elif pct >= 50 %}👍
+      {% else %}📊{% endif %}
+    </div>
+    <div class="result-title">
+      {% if session.locked %}Session Was Locked{% else %}Exam Submitted{% endif %}
+    </div>
+    <div class="result-sub">{{ session.student_name }} · {{ session.title }}</div>
+
+    <!-- Score circle -->
+    <div class="score-circle" style="border-color:
+        {% if pct>=70 %}var(--green){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %}">
+      <span class="score-num" style="color:
+        {% if pct>=70 %}var(--green){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %}">
+        {{ pct }}%
+      </span>
+      <span class="score-lbl">Score</span>
+    </div>
+
+    <!-- Score details -->
+    <div class="info-rows">
+      <div class="ir">
+        <span class="ir-label">Raw Score</span>
+        <span class="ir-val">{{ session.score|int }} / {{ session.max_score|int }}</span>
+      </div>
+      <div class="ir">
+        <span class="ir-label">Submitted</span>
+        <span class="ir-val" style="font-size:.75rem;">{{ session.submitted_at[:16].replace('T',' ') }} UTC</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Proctoring summary -->
+    <div class="proctor-summary">
+      <div class="ps-title">🛡️ Proctoring Summary</div>
+      <div class="ps-grid">
+        <div class="ps-item">
+          {% set att = session.attention_avg %}
+          <div class="ps-val" style="color:{% if att>60 %}var(--green){% elif att>35 %}var(--amber){% else %}var(--red){% endif %}">
+            {{ "%.0f"|format(att) }}%</div>
+          <div class="ps-lbl">Avg Attention</div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-val">
+            {% if session.flags > 0 %}
+              <span class="badge badge-red">⚠ {{ session.flags }} flag{% if session.flags!=1 %}s{% endif %}</span>
+            {% else %}
+              <span class="badge badge-green">✓ Clean</span>
+            {% endif %}
+          </div>
+          <div class="ps-lbl">Violations</div>
+        </div>
+        {% if session.id_fail_count is defined and session.id_fail_count is not none %}
+        <div class="ps-item">
+          <div class="ps-val">
+            {% if session.id_fail_count > 0 %}
+              <span class="badge badge-purple">{{ session.id_fail_count }}×</span>
+            {% else %}
+              <span class="badge badge-green">✓ OK</span>
+            {% endif %}
+          </div>
+          <div class="ps-lbl">Identity Checks</div>
+        </div>
+        {% endif %}
+        <div class="ps-item">
+          <div class="ps-val">
+            {% if session.locked %}
+              <span class="badge badge-red">🔒 Locked</span>
+            {% else %}
+              <span class="badge badge-green">✓ Normal</span>
+            {% endif %}
+          </div>
+          <div class="ps-lbl">Session Status</div>
+        </div>
+      </div>
+      {% if session.locked %}
+      <div style="margin-top:10px;font-size:.78rem;color:var(--red);background:rgba(240,90,90,.08);
+          border:1px solid rgba(240,90,90,.2);border-radius:7px;padding:8px 10px;">
+        🔒 {{ session.lock_reason }}
+      </div>
+      {% endif %}
+    </div>
+
+    <p style="font-size:.8rem;color:var(--text3);margin-bottom:20px;">
+      Your results have been recorded and are available to your teacher.
+    </p>
+
+  {% else %}
+    <!-- Not submitted -->
+    <div class="result-icon">📋</div>
+    <div class="result-title">Exam Not Submitted</div>
+    <div class="result-sub">{{ session.student_name }} · {{ session.title }}</div>
+    <div class="info-rows">
+      <div class="ir">
+        <span class="ir-label">Status</span>
+        <span class="ir-val">
+          {% if session.status == 'locked' %}
+            <span class="badge badge-red">🔒 {{ session.lock_reason|truncate(40) }}</span>
+          {% else %}
+            <span class="badge badge-amber">{{ session.status|capitalize }}</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    <p style="font-size:.82rem;color:var(--text3);margin-bottom:20px;">
+      Your session ended without a final submission. Contact your teacher.
+    </p>
+  {% endif %}
+
+  <a class="btn" href="/join">← Back to Home</a>
+</div>
+</body>
+</html>

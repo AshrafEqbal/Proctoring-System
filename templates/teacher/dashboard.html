@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Teacher Dashboard — ProctorVault{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">🛡️</div>
+      <div><span>ProctorVault</span><sub>Teacher Portal</sub></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Exams</div>
+      <a class="nav-item active" href="/teacher"><span class="icon">📋</span>My Exams</a>
+      <a class="nav-item" href="/teacher/exam/new"><span class="icon">➕</span>New Exam</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="av" id="user-av">{{ user.name[:2].upper() }}</div>
+        <div class="info">
+          <div class="name">{{ user.name }}</div>
+          <div class="role">{{ user.role }}</div>
+        </div>
+      </div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div>
+        <h2>My Exams</h2>
+        <div class="breadcrumb">Teacher Dashboard</div>
+      </div>
+      <a href="/teacher/exam/new" class="btn btn-primary">➕ New Exam</a>
+    </div>
+    <div class="page-content">
+
+      {% if exams %}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+        {% for exam in exams %}
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:18px 20px 14px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
+              <div>
+                <div style="font-size:.95rem;font-weight:700;color:var(--text0);">{{ exam.title }}</div>
+                <div style="font-size:.75rem;color:var(--text3);margin-top:3px;">Code: <span style="font-family:var(--mono);color:var(--accent);">{{ exam.exam_code }}</span></div>
+              </div>
+              {% if exam.status == 'active' %}
+                <span class="badge badge-green"><span class="live-dot"></span>Active</span>
+              {% elif exam.status == 'draft' %}
+                <span class="badge badge-gray">Draft</span>
+              {% else %}
+                <span class="badge badge-red">Closed</span>
+              {% endif %}
+            </div>
+            {% if exam.description %}
+            <div style="font-size:.8rem;color:var(--text2);margin-bottom:10px;">{{ exam.description[:80] }}{% if exam.description|length > 80 %}…{% endif %}</div>
+            {% endif %}
+            <div style="display:flex;gap:14px;font-size:.75rem;color:var(--text3);">
+              <span>⏱ {{ exam.duration_mins }}min</span>
+              <span>👤 {{ exam.session_count }} students</span>
+              {% if exam.starts_at %}<span>📅 {{ exam.starts_at[:10] }}</span>{% endif %}
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--bg1);">
+            <a href="/teacher/exam/{{ exam.id }}/edit"    class="btn btn-ghost btn-sm">✏️ Edit</a>
+            <a href="/teacher/exam/{{ exam.id }}/roster"  class="btn btn-ghost btn-sm">👥 Roster</a>
+            <a href="/teacher/exam/{{ exam.id }}/monitor" class="btn btn-primary btn-sm">👁 Monitor</a>
+            <a href="/teacher/exam/{{ exam.id }}/report"  class="btn btn-ghost btn-sm">📊 Report</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:60px 20px;color:var(--text3);">
+        <div style="font-size:3rem;margin-bottom:16px;">📝</div>
+        <div style="font-size:1rem;color:var(--text2);margin-bottom:8px;">No exams yet</div>
+        <div style="font-size:.85rem;margin-bottom:24px;">Create your first exam to get started</div>
+        <a href="/teacher/exam/new" class="btn btn-primary">Create Exam →</a>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

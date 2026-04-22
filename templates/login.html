@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProctorVault — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0:#07090f; --bg1:#0d1117; --bg2:#141924; --bg3:#1c2333;
+  --border:#2a3550; --text0:#f0f4ff; --text1:#c8d3f0; --text2:#7b8db8; --text3:#4a5578;
+  --accent:#4f8ef7; --accent2:#2563eb; --green:#22d3a0; --red:#f05a5a;
+  --font:'DM Sans',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg0);color:var(--text1);min-height:100vh;display:grid;place-items:center;padding:20px;overflow:hidden;}
+.bg-grid{position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:.18;pointer-events:none;}
+.bg-glow{position:fixed;width:600px;height:600px;border-radius:50%;background:radial-gradient(ellipse,rgba(79,142,247,.12),transparent 70%);top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;}
+.card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:18px;
+  padding:40px;width:420px;max-width:100%;position:relative;z-index:1;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+  animation:rise .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+.logo-wrap{text-align:center;margin-bottom:32px;}
+.logo-icon{
+  width:54px;height:54px;border-radius:14px;margin:0 auto 12px;
+  background:linear-gradient(135deg,var(--accent2),#6d28d9);
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+}
+.logo-title{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--text0);letter-spacing:-.02em;}
+.logo-sub{font-size:.78rem;color:var(--text3);margin-top:4px;letter-spacing:.06em;text-transform:uppercase;}
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
+.form-label{display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase;}
+.form-input{
+  width:100%;background:var(--bg1);border:1px solid var(--border);color:var(--text0);
+  padding:11px 14px;border-radius:10px;font-size:.9rem;font-family:var(--font);
+  outline:none;transition:border .2s,box-shadow .2s;margin-bottom:14px;
+}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.15);}
+.btn-login{
+  width:100%;background:linear-gradient(135deg,var(--accent2),#5b21b6);
+  color:#fff;border:none;padding:12px;border-radius:10px;font-size:.95rem;
+  font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;
+  font-family:var(--font);letter-spacing:.01em;
+}
+.btn-login:hover{opacity:.92;}
+.btn-login:active{transform:scale(.98);}
+.error{background:rgba(240,90,90,.1);color:var(--red);border:1px solid rgba(240,90,90,.25);padding:10px 14px;border-radius:8px;font-size:.82rem;margin-bottom:16px;}
+.join-link{text-align:center;margin-top:22px;font-size:.82rem;color:var(--text3);}
+.join-link a{color:var(--accent);}
+.role-badges{display:flex;gap:8px;justify-content:center;margin-bottom:6px;flex-wrap:wrap;}
+.rb{padding:3px 10px;border-radius:999px;font-size:.67rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.rb-admin{background:rgba(240,90,90,.15);color:var(--red);border:1px solid rgba(240,90,90,.3);}
+.rb-teacher{background:rgba(240,160,48,.15);color:#f0a030;border:1px solid rgba(240,160,48,.3);}
+.rb-student{background:rgba(34,211,160,.15);color:var(--green);border:1px solid rgba(34,211,160,.3);}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+<div class="card">
+  <div class="logo-wrap">
+    <div class="logo-icon">🛡️</div>
+    <div class="logo-title">ProctorVault</div>
+    <div class="logo-sub">Secure Exam Platform</div>
+  </div>
+  <div class="role-badges">
+    <span class="rb rb-admin">Admin</span>
+    <span class="rb rb-teacher">Teacher</span>
+    <span class="rb rb-student">Student Portal</span>
+  </div>
+  <hr class="divider">
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="POST">
+    <label class="form-label">Email Address</label>
+    <input class="form-input" type="email" name="email" placeholder="you@example.com" required autofocus>
+    <label class="form-label">Password</label>
+    <input class="form-input" type="password" name="password" placeholder="••••••••" required>
+    <button class="btn-login" type="submit">Sign In →</button>
+  </form>
+  <div class="join-link">
+    Taking an exam? <a href="/join">Join with exam code →</a>
+  </div>
+</div>
+</body>
+</html>

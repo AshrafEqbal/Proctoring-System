@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Exams — Admin{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Admin</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/admin"><span class="icon">🏠</span>Dashboard</a>
+      <a class="nav-item" href="/admin/live"><span class="icon">📡</span>Live Monitor</a>
+      <a class="nav-item" href="/admin/users"><span class="icon">👥</span>Users</a>
+      <a class="nav-item active" href="/admin/exams"><span class="icon">📋</span>Exams</a>
+      <a class="nav-item" href="/admin/sessions"><span class="icon">📁</span>Sessions</a>
+      <a class="nav-item" href="/admin/logs"><span class="icon">🗒️</span>Logs</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">Administrator</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+  <div class="main-area">
+    <div class="topbar"><div><h2>All Exams</h2><div class="breadcrumb">{{ exams|length }} total</div></div></div>
+    <div class="page-content">
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Title</th><th>Teacher</th><th>Code</th><th>Status</th><th>Sessions</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for exam in exams %}
+              <tr>
+                <td style="font-weight:600;color:var(--text0);">{{ exam.title }}</td>
+                <td style="font-size:.8rem;color:var(--text2);">{{ exam.teacher_name }}</td>
+                <td><span style="font-family:var(--mono);font-size:.8rem;color:var(--accent);">{{ exam.exam_code }}</span></td>
+                <td>
+                  <span class="badge {% if exam.status=='active' %}badge-green{% elif exam.status=='draft' %}badge-gray{% else %}badge-red{% endif %}">{{ exam.status }}</span>
+                </td>
+                <td style="color:var(--text1);">{{ exam.session_count }}</td>
+                <td style="font-size:.75rem;color:var(--text3);">{{ exam.created_at[:10] }}</td>
+                <td style="display:flex;gap:6px;">
+                  <a href="/teacher/exam/{{ exam.id }}/roster"  class="btn btn-ghost btn-sm">👥</a>
+                  <a href="/teacher/exam/{{ exam.id }}/monitor" class="btn btn-ghost btn-sm">👁</a>
+                  <a href="/teacher/exam/{{ exam.id }}/report"  class="btn btn-ghost btn-sm">📊</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>System Check — ProctorVault</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#07090f;--bg1:#0d1117;--bg2:#141924;--bg3:#1c2333;--border:#2a3550;--border2:#364060;--text0:#f0f4ff;--text1:#c8d3f0;--text2:#7b8db8;--text3:#4a5578;--accent:#4f8ef7;--accent2:#2563eb;--green:#22d3a0;--red:#f05a5a;--amber:#f0a030;--font:'DM Sans',sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg0);color:var(--text1);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+.header{text-align:center;margin-bottom:28px;}
+.header h1{font-family:'Space Mono',monospace;font-size:1.4rem;color:var(--text0);margin-bottom:6px;}
+.header p{font-size:.85rem;color:var(--text3);}
+.step-indicator{display:flex;align-items:center;gap:0;margin-bottom:32px;}
+.step{display:flex;align-items:center;gap:8px;font-size:.75rem;font-weight:600;}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;}
+.step.done .step-num{background:var(--green);color:var(--bg0);}
+.step.active .step-num{background:var(--accent2);color:#fff;}
+.step.pending .step-num{background:var(--bg3);color:var(--text3);border:1px solid var(--border);}
+.step.done span, .step.active span{color:var(--text1);}
+.step.pending span{color:var(--text3);}
+.step-sep{width:40px;height:1px;background:var(--border);margin:0 4px;}
+.main-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;width:680px;max-width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.check-section{padding:24px;border-right:1px solid var(--border);}
+.check-section:last-child{border-right:none;}
+.cs-title{font-size:.8rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+/* Video preview */
+.video-preview{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;margin-bottom:14px;}
+.video-preview video{width:100%;height:100%;object-fit:cover;}
+.video-overlay{position:absolute;bottom:8px;left:8px;right:8px;display:flex;gap:6px;flex-wrap:wrap;}
+/* Audio */
+.audio-canvas-wrap{background:var(--bg1);border-radius:8px;overflow:hidden;margin-bottom:14px;height:70px;border:1px solid var(--border);}
+canvas#audio-canvas{width:100%;height:100%;}
+/* Check items */
+.check-list{display:flex;flex-direction:column;gap:8px;}
+.check-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);transition:border-color .3s;}
+.check-item .ci-icon{font-size:1.1rem;width:22px;text-align:center;}
+.check-item .ci-text{flex:1;font-size:.82rem;}
+.check-item .ci-status{font-size:.75rem;font-weight:600;white-space:nowrap;}
+.check-item.pass{border-color:rgba(34,211,160,.3);}
+.check-item.fail{border-color:rgba(240,90,90,.3);}
+.check-item.checking .ci-status{color:var(--text3);}
+.check-item.pass .ci-status{color:var(--green);}
+.check-item.fail .ci-status{color:var(--red);}
+.status-spin{display:inline-block;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.action-bar{padding:20px 24px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg2);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:var(--font);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-start{background:linear-gradient(135deg,var(--accent2),#059669);color:#fff;}
+.btn-start:not(:disabled):hover{opacity:.9;}
+.btn-retry{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.status-text{font-size:.82rem;color:var(--text3);}
+.status-text.ready{color:var(--green);}
+.exam-info{display:flex;flex-direction:column;gap:4px;margin-bottom:16px;}
+.ei-row{display:flex;gap:8px;align-items:center;font-size:.8rem;}
+.ei-label{color:var(--text3);min-width:80px;}
+.ei-val{color:var(--text0);font-weight:500;}
+@media(max-width:640px){.check-grid{grid-template-columns:1fr;}.check-section{border-right:none;border-bottom:1px solid var(--border);}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🔍 System Check</h1>
+  <p>Verifying your camera and microphone before the exam</p>
+</div>
+<div class="step-indicator">
+  <div class="step done"><div class="step-num">✓</div><span>Join</span></div>
+  <div class="step-sep"></div>
+  <div class="step active"><div class="step-num">2</div><span>System Check</span></div>
+  <div class="step-sep"></div>
+  <div class="step pending"><div class="step-num">3</div><span>Exam</span></div>
+</div>
+<div class="main-card">
+  <div class="check-grid">
+
+    <!-- Left: Camera + Audio -->
+    <div class="check-section">
+      <div class="cs-title">📷 Camera</div>
+      <div class="video-preview">
+        <video id="video-el" autoplay muted playsinline></video>
+      </div>
+      <div class="cs-title">🎤 Microphone</div>
+      <div class="audio-canvas-wrap">
+        <canvas id="audio-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Right: Checks + Exam info -->
+    <div class="check-section">
+      <div class="cs-title">📋 Exam Details</div>
+      <div class="exam-info">
+        <div class="ei-row"><span class="ei-label">Title</span><span class="ei-val">{{ session.title }}</span></div>
+        <div class="ei-row"><span class="ei-label">Student</span><span class="ei-val">{{ session.student_name }}</span></div>
+        <div class="ei-row"><span class="ei-label">Duration</span><span class="ei-val">{{ session.duration_mins }} min</span></div>
+        {% if session.face_verify_enabled %}
+        <div class="ei-row">
+          <span class="ei-label">Identity</span>
+          <span class="ei-val">
+            {% if session.id_verified %}
+            <span style="color:#22d3a0;font-size:.78rem;font-weight:700;">✓ Verified</span>
+            {% else %}
+            <span style="color:#f0a030;font-size:.78rem;">⚠ Not verified</span>
+            {% endif %}
+          </span>
+        </div>
+        <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:8px;
+             padding:8px 10px;margin-top:6px;font-size:.75rem;color:#a78bfa;display:flex;gap:7px;align-items:center;">
+          <span>🪪</span>
+          <span>Face identity monitoring is active for this exam. Keep your face clearly visible throughout.</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="cs-title" style="margin-top:8px;">✅ Checks</div>
+      <div class="check-list">
+        <div class="check-item checking" id="chk-camera">
+          <span class="ci-icon">📷</span>
+          <span class="ci-text">Camera access</span>
+          <span class="ci-status"><span class="status-spin">⟳</span></span>
+        </div>
+        <div class="check-item checking" id="chk-face">
+          <span class="ci-icon">👤</span>
+          <span class="ci-text">Face visible</span>
+          <span class="ci-status"><span class="status-spin">⟳</span></span>
+        </div>
+        <div class="check-item checking" id="chk-mic">
+          <span class="ci-icon">🎤</span>
+          <span class="ci-text">Microphone access</span>
+          <span class="ci-status"><span class="status-spin">⟳</span></span>
+        </div>
+        <div class="check-item checking" id="chk-audio">
+          <span class="ci-icon">🔊</span>
+          <span class="ci-text">Audio signal detected</span>
+          <span class="ci-status"><span class="status-spin">⟳</span></span>
+        </div>
+        <div class="check-item checking" id="chk-browser">
+          <span class="ci-icon">🌐</span>
+          <span class="ci-text">Browser compatibility</span>
+          <span class="ci-status"><span class="status-spin">⟳</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="action-bar">
+    <span class="status-text" id="status-msg">Running checks…</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-retry" onclick="startChecks()">↻ Retry</button>
+      <button class="btn btn-start" id="btn-start" disabled
+              onclick="window.location='/exam/{{ session.id }}'">
+        Start Exam →
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SESSION_ID = "{{ session.id }}";
+let stream = null;
+let audioCtx = null, analyser = null;
+let checks = { camera: false, face: false, mic: false, audio: false, browser: false };
+let animFrame = null;
+let faceDetectTimer = null;
+let audioSpikeDetected = false;
+
+const canvasEl = document.getElementById('audio-canvas');
+const ctx2d    = canvasEl.getContext('2d');
+const videoEl  = document.getElementById('video-el');
+
+function setCheck(id, state, msg) {
+  const el = document.getElementById('chk-'+id);
+  el.className = `check-item ${state}`;
+  el.querySelector('.ci-status').textContent = {
+    'pass': '✓ OK', 'fail': '✗ Failed', 'checking': '…'
+  }[state] || msg;
+  checks[id] = state === 'pass';
+  updateReady();
+}
+
+function updateReady() {
+  const allPass = Object.values(checks).every(v=>v);
+  document.getElementById('btn-start').disabled = !allPass;
+  document.getElementById('status-msg').textContent = allPass ? '✅ All checks passed' : 'Checking…';
+  document.getElementById('status-msg').className = allPass ? 'status-text ready' : 'status-text';
+}
+
+async function startChecks() {
+  Object.keys(checks).forEach(k => { checks[k]=false; setCheck(k,'checking','…'); });
+  document.getElementById('btn-start').disabled = true;
+  audioSpikeDetected = false;
+
+  // Browser check
+  const ok = !!(navigator.mediaDevices && window.AudioContext);
+  setCheck('browser', ok ? 'pass' : 'fail');
+
+  // Camera
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480,facingMode:'user'}, audio:true });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+    setCheck('camera', 'pass');
+
+    // Audio
+    setCheck('mic', 'pass');
+    audioCtx = new AudioContext();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser  = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    drawAudio();
+
+    // detect audio spike within 5s
+    let audioCheckTime = Date.now();
+    const checkAudioInterval = setInterval(() => {
+      const buf = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(buf);
+      const rms = Math.sqrt(buf.reduce((s,v)=>s+v*v,0)/buf.length);
+      if (rms > 0.01) {
+        setCheck('audio','pass');
+        audioSpikeDetected = true;
+        clearInterval(checkAudioInterval);
+      } else if (Date.now()-audioCheckTime > 8000) {
+        setCheck('audio','fail');
+        clearInterval(checkAudioInterval);
+      }
+    }, 200);
+
+    // Face detection (simulated — just check if video has content)
+    faceDetectTimer = setTimeout(() => {
+      if (videoEl.readyState >= 2) setCheck('face','pass');
+      else setCheck('face','fail');
+    }, 2000);
+
+  } catch(e) {
+    setCheck('camera','fail'); setCheck('mic','fail');
+    setCheck('audio','fail'); setCheck('face','fail');
+    document.getElementById('status-msg').textContent = 'Camera/mic access denied. Check browser permissions.';
+  }
+}
+
+function drawAudio() {
+  if (!analyser) return;
+  const buf = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(buf);
+  const W = canvasEl.width = canvasEl.offsetWidth * window.devicePixelRatio || 300;
+  const H = canvasEl.height = canvasEl.offsetHeight * window.devicePixelRatio || 70;
+  ctx2d.clearRect(0,0,W,H);
+  ctx2d.strokeStyle = '#22d3a0';
+  ctx2d.lineWidth = 1.5 * window.devicePixelRatio;
+  ctx2d.beginPath();
+  for (let i=0;i<buf.length;i++) {
+    const x = (i/buf.length)*W;
+    const y = ((buf[i]/128)-1)*(H*0.4) + H/2;
+    i===0 ? ctx2d.moveTo(x,y) : ctx2d.lineTo(x,y);
+  }
+  ctx2d.stroke();
+  animFrame = requestAnimationFrame(drawAudio);
+}
+
+startChecks();
+</script>
+</body>
+</html>

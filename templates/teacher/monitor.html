@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+{% block title %}Monitor — {{ exam.title }}{% endblock %}
+{% block head %}
+<style>
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+.stu-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
+.stu-card:hover{border-color:var(--border2);}
+.stu-card.locked{border-color:rgba(240,90,90,.5);}
+.stu-card.flagged{border-color:rgba(240,160,48,.35);}
+.stu-card.id-warn{border-color:rgba(167,139,250,.45);}
+
+/* Camera feed */
+.sc-cam{position:relative;background:#060810;aspect-ratio:4/3;}
+.sc-cam img{width:100%;height:100%;object-fit:cover;opacity:.25;transition:opacity .3s;}
+.sc-cam img.loaded{opacity:1;}
+.sc-spin{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;animation:spin .8s linear infinite;pointer-events:none;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sc-lock-ov{position:absolute;inset:0;background:rgba(180,20,20,.78);display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:5px;}
+.stu-card.locked .sc-lock-ov{display:flex;}
+/* ID mismatch badge on feed */
+.sc-id-badge{position:absolute;top:7px;right:7px;padding:3px 8px;border-radius:999px;
+  font-size:.65rem;font-weight:700;display:none;}
+.sc-id-ok{background:rgba(34,211,160,.85);color:#0a1a10;}
+.sc-id-fail{background:rgba(167,139,250,.9);color:#0a0814;}
+
+/* Card body */
+.sc-body{padding:11px;}
+.sc-name{font-size:.88rem;font-weight:700;color:var(--text0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sc-email{font-size:.68rem;color:var(--text3);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sc-bars{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+.sc-bar-row{display:flex;align-items:center;gap:7px;font-size:.7rem;color:var(--text2);}
+.sc-bar-row .lbl{min-width:48px;}
+.sc-bar-t{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.sc-bar-f{height:100%;border-radius:2px;transition:width .5s,background .4s;}
+.sc-bar-row .val{min-width:28px;text-align:right;font-weight:600;font-size:.72rem;}
+.sc-id-row{display:flex;align-items:center;justify-content:space-between;
+  padding:4px 7px;background:var(--bg3);border-radius:6px;font-size:.7rem;margin-bottom:6px;}
+.sc-flags{font-size:.68rem;color:var(--amber);margin-bottom:5px;}
+.sc-actions{display:flex;gap:5px;}
+.sc-actions button{flex:1;padding:5px 0;font-size:.7rem;}
+
+/* Detail panel */
+.detail-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:20px;}
+.detail-overlay.open{display:flex;}
+.detail-panel{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;
+  width:700px;max-width:100%;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden;}
+.dp-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;
+  border-bottom:1px solid var(--border);}
+.dp-header h3{font-size:1rem;color:var(--text0);}
+.dp-body{display:grid;grid-template-columns:1fr 220px;gap:0;}
+.dp-feed{position:relative;background:#000;aspect-ratio:4/3;}
+.dp-feed img{width:100%;height:100%;object-fit:cover;}
+.dp-info{padding:16px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:10px;}
+.di-row{display:flex;justify-content:space-between;font-size:.8rem;padding:5px 0;
+  border-bottom:1px solid var(--border);}
+.di-row:last-child{border:none;}
+.di-lbl{color:var(--text2);}
+.di-val{color:var(--text0);font-weight:500;text-align:right;}
+.dp-actions{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Teacher</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/teacher"><span class="icon">📋</span>My Exams</a>
+      <a class="nav-item" href="/teacher/exam/{{ exam.id }}/edit"><span class="icon">✏️</span>Edit Exam</a>
+      <a class="nav-item" href="/teacher/exam/{{ exam.id }}/roster"><span class="icon">👥</span>Roster</a>
+      <a class="nav-item active" href="#"><span class="icon">👁</span>Live Monitor</a>
+      <a class="nav-item" href="/teacher/exam/{{ exam.id }}/report"><span class="icon">📊</span>Report</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">{{ user.role }}</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div>
+        <h2>{{ exam.title }}</h2>
+        <div class="breadcrumb">
+          Code: <span style="font-family:var(--mono);color:var(--accent);">{{ exam.exam_code }}</span>
+          {% if exam.face_verify_enabled %} · <span style="color:#a78bfa;">🪪 Face Verify ({{ (exam.face_verify_thresh*100)|int }}%)</span>{% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="badge badge-blue"><span class="live-dot"></span><span id="active-count">0</span> Active</span>
+        <span class="badge badge-red" id="locked-badge" style="display:none"><span id="locked-count">0</span> Locked</span>
+        {% if exam.face_verify_enabled %}
+        <span class="badge" id="id-warn-badge" style="display:none;background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.3);">
+          🪪 <span id="id-warn-count">0</span> ID Warn
+        </span>
+        {% endif %}
+        <button class="btn btn-danger btn-sm" onclick="lockAll()">🔒 Lock All</button>
+        <button class="btn btn-success btn-sm" onclick="unlockAll()">🔓 Unlock All</button>
+        <a href="/teacher/exam/{{ exam.id }}/report" class="btn btn-ghost btn-sm">📊 Report</a>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- Stats strip -->
+      <div class="stats-grid" style="margin-bottom:20px;">
+        <div class="stat-card s-blue"><div class="stat-label">Active Now</div><div class="stat-value" id="st-active">0</div></div>
+        <div class="stat-card s-red"><div class="stat-label">Locked</div><div class="stat-value" id="st-locked" style="color:var(--red)">0</div></div>
+        <div class="stat-card s-amber"><div class="stat-label">Flagged</div><div class="stat-value" id="st-flagged" style="color:var(--amber)">0</div></div>
+        <div class="stat-card s-green"><div class="stat-label">Avg Attention</div><div class="stat-value" id="st-att" style="color:var(--green)">—</div></div>
+        {% if exam.face_verify_enabled %}
+        <div class="stat-card" style="border-color:rgba(167,139,250,.3);">
+          <div class="stat-label">ID Warns</div>
+          <div class="stat-value" id="st-id-warn" style="color:#a78bfa">0</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Student grid -->
+      <div class="student-grid" id="student-grid">
+        <div class="empty-state" id="empty-msg">
+          <div style="font-size:2.5rem;margin-bottom:12px;">👁️</div>
+          <p>Waiting for students to connect…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lock modal -->
+<div class="modal-bg" id="lock-modal">
+  <div class="modal">
+    <h3>🔒 Lock Student</h3>
+    <p>Enter the reason for locking this student's exam session.</p>
+    <input class="form-input" type="text" id="lock-reason" placeholder="e.g. Suspicious behaviour">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeLock()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmLock()">Lock Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- Student detail panel -->
+<div class="detail-overlay" id="detail-overlay">
+  <div class="detail-panel">
+    <div class="dp-header">
+      <h3 id="dp-name">Student Name</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeDetail()">✕ Close</button>
+    </div>
+    <div class="dp-body">
+      <div class="dp-feed">
+        <img id="dp-img" src="" alt="Live feed">
+      </div>
+      <div class="dp-info">
+        <div class="di-row"><span class="di-lbl">Email</span><span class="di-val" id="dp-email">—</span></div>
+        <div class="di-row"><span class="di-lbl">Attention</span><span class="di-val" id="dp-att">—</span></div>
+        <div class="di-row"><span class="di-lbl">Suspicion</span><span class="di-val" id="dp-sus">—</span></div>
+        <div class="di-row"><span class="di-lbl">Flags</span><span class="di-val" id="dp-flags">—</span></div>
+        <div class="di-row" id="dp-id-row" style="display:none">
+          <span class="di-lbl">ID Match</span><span class="di-val" id="dp-id">—</span>
+        </div>
+        <div class="di-row"><span class="di-lbl">Status</span><span class="di-val" id="dp-status">—</span></div>
+        <div class="di-row"><span class="di-lbl">Lock Reason</span><span class="di-val" id="dp-lock-reason" style="font-size:.72rem;color:var(--red);">—</span></div>
+      </div>
+    </div>
+    <div class="dp-actions" id="dp-actions">
+      <button class="btn btn-danger" id="dp-btn-lock" onclick="">🔒 Lock</button>
+      <button class="btn btn-success" id="dp-btn-unlock" onclick="">🔓 Unlock</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EXAM_ID    = "{{ exam.id }}";
+const FACE_VERIFY= {{ 'true' if exam.face_verify_enabled else 'false' }};
+const socket     = io();
+const students   = {};
+let lockTarget   = null;
+let detailSid    = null;
+
+// ── Socket ──────────────────────────────────────────────────────────────────
+socket.on('connect', () => socket.emit('join_teacher_room', {exam_id: EXAM_ID}));
+
+socket.on('exam_students', list => { list.forEach(addStudent); updateStats(); });
+socket.on('student_joined', data => {
+  if (data.exam_id !== EXAM_ID) return;
+  if (!students[data.session_id]) addStudent(data);
+  updateStats();
+  toast('✅ '+data.name+' connected');
+});
+socket.on('student_left', data => { removeStudent(data.session_id); updateStats(); });
+socket.on('student_update', data => { if (data.exam_id === EXAM_ID) updateStudent(data); });
+
+// ── Add student card ─────────────────────────────────────────────────────────
+function addStudent(data) {
+  students[data.session_id] = data;
+  document.getElementById('empty-msg')?.remove();
+
+  const idBarHtml = FACE_VERIFY ? `
+    <div class="sc-id-row" id="sc-id-row-${data.session_id}">
+      <span style="color:var(--text2);">🪪 Identity</span>
+      <span id="sc-id-val-${data.session_id}" style="color:var(--text3);">—</span>
+    </div>` : '';
+
+  const card = document.createElement('div');
+  card.id = 'sc-'+data.session_id;
+  card.className = 'stu-card'+(data.locked?' locked':'')+(data.flags>0?' flagged':'');
+  card.innerHTML = `
+    <div class="sc-cam" onclick="openDetail('${data.session_id}')" style="cursor:pointer;">
+      <img id="scimg-${data.session_id}" src="" alt="" onload="this.classList.add('loaded')">
+      <span class="sc-spin" id="scspin-${data.session_id}">⟳</span>
+      <div class="sc-lock-ov"><span style="font-size:2rem">🔒</span>
+        <span style="font-size:.72rem;color:#fca5a5;font-weight:600">LOCKED</span></div>
+      <span class="sc-id-badge" id="sc-id-badge-${data.session_id}"></span>
+    </div>
+    <div class="sc-body">
+      <div class="sc-name" title="${escHtml(data.name)}">${escHtml(data.name)}</div>
+      <div class="sc-email" id="sc-email-${data.session_id}" title="">${data.session_id.slice(-10)}…</div>
+      <div class="sc-bars">
+        <div class="sc-bar-row">
+          <span class="lbl">Attn</span>
+          <div class="sc-bar-t"><div class="sc-bar-f" id="scatt-${data.session_id}" style="width:70%;background:var(--green)"></div></div>
+          <span class="val" id="scattv-${data.session_id}" style="color:var(--green)">70%</span>
+        </div>
+        <div class="sc-bar-row">
+          <span class="lbl">Susp</span>
+          <div class="sc-bar-t"><div class="sc-bar-f" id="scsus-${data.session_id}" style="width:30%;background:var(--green)"></div></div>
+          <span class="val" id="scsusv-${data.session_id}" style="color:var(--green)">30%</span>
+        </div>
+      </div>
+      ${idBarHtml}
+      <div class="sc-flags" id="scflags-${data.session_id}"></div>
+      <div class="sc-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${data.session_id}')">🔍 Detail</button>
+        <button class="btn btn-danger btn-sm" onclick="lockStudent('${data.session_id}')">🔒</button>
+        <button class="btn btn-success btn-sm" onclick="unlockStudent('${data.session_id}')">🔓</button>
+      </div>
+    </div>`;
+  document.getElementById('student-grid').appendChild(card);
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Remove ───────────────────────────────────────────────────────────────────
+function removeStudent(sid) {
+  delete students[sid];
+  document.getElementById('sc-'+sid)?.remove();
+  if (!Object.keys(students).length) {
+    const g = document.getElementById('student-grid');
+    const d = document.createElement('div');
+    d.id='empty-msg'; d.className='empty-state';
+    d.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px;">👁️</div><p>All students disconnected.</p>';
+    g.appendChild(d);
+  }
+  if (detailSid === sid) closeDetail();
+}
+
+// ── Update card ───────────────────────────────────────────────────────────────
+function updateStudent(data) {
+  students[data.session_id] = data;
+
+  // Feed image
+  const img = document.getElementById('scimg-'+data.session_id);
+  if (img && data.thumb) {
+    img.src = data.thumb;
+    document.getElementById('scspin-'+data.session_id)?.remove();
+  }
+
+  // Card class
+  const card = document.getElementById('sc-'+data.session_id);
+  if (card) {
+    let cls = 'stu-card';
+    if (data.locked) cls += ' locked';
+    if (data.flags > 0) cls += ' flagged';
+    if (FACE_VERIFY && data.id_score !== null && data.id_score < 0.72) cls += ' id-warn';
+    card.className = cls;
+  }
+
+  // Score bars
+  const ab = document.getElementById('scatt-'+data.session_id);
+  const sb = document.getElementById('scsus-'+data.session_id);
+  const av = document.getElementById('scattv-'+data.session_id);
+  const sv = document.getElementById('scsusv-'+data.session_id);
+  if (ab) { ab.style.width=data.attention+'%'; ab.style.background=scoreColor(data.attention); }
+  if (sb) { sb.style.width=data.suspicion+'%'; sb.style.background=susColor(data.suspicion); }
+  if (av) { av.textContent=data.attention.toFixed(0)+'%'; av.style.color=scoreColor(data.attention); }
+  if (sv) { sv.textContent=data.suspicion.toFixed(0)+'%'; sv.style.color=susColor(data.suspicion); }
+
+  // Flags
+  const fl = document.getElementById('scflags-'+data.session_id);
+  if (fl) fl.textContent = data.flags>0 ? '⚠ '+data.flags+' violation'+(data.flags===1?'':'s') : '';
+
+  // Identity score
+  if (FACE_VERIFY && data.id_score !== null && data.id_score !== undefined) {
+    const idVal = document.getElementById('sc-id-val-'+data.session_id);
+    const idBadge = document.getElementById('sc-id-badge-'+data.session_id);
+    const pct = Math.round(data.id_score * 100);
+    const ok  = data.id_score >= 0.72;
+    if (idVal) { idVal.textContent = pct+'%'; idVal.style.color = ok?'var(--green)':'#a78bfa'; }
+    if (idBadge) {
+      idBadge.textContent = ok ? `✓ ${pct}%` : `⚠ ${pct}%`;
+      idBadge.className   = 'sc-id-badge ' + (ok ? 'sc-id-ok' : 'sc-id-fail');
+      idBadge.style.display = 'block';
+    }
+  }
+
+  // Update detail panel if this student is open
+  if (detailSid === data.session_id) refreshDetail(data);
+  updateStats();
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const all    = Object.values(students);
+  const locked = all.filter(s=>s.locked).length;
+  const flagged= all.filter(s=>s.flags>0).length;
+  const idWarn = FACE_VERIFY ? all.filter(s=>s.id_score!==null && s.id_score<0.72).length : 0;
+  const avgAtt = all.length ? all.reduce((s,u)=>s+u.attention,0)/all.length : 0;
+
+  document.getElementById('st-active').textContent  = all.length;
+  document.getElementById('st-locked').textContent  = locked;
+  document.getElementById('st-flagged').textContent = flagged;
+  document.getElementById('st-att').textContent     = all.length ? avgAtt.toFixed(0)+'%' : '—';
+  document.getElementById('active-count').textContent = all.length;
+  document.getElementById('locked-count').textContent = locked;
+  document.getElementById('locked-badge').style.display = locked>0?'':'none';
+
+  if (FACE_VERIFY) {
+    const stId = document.getElementById('st-id-warn');
+    if (stId) stId.textContent = idWarn;
+    const wBadge = document.getElementById('id-warn-badge');
+    if (wBadge) {
+      document.getElementById('id-warn-count').textContent = idWarn;
+      wBadge.style.display = idWarn>0 ? '' : 'none';
+    }
+  }
+}
+
+// ── Detail panel ──────────────────────────────────────────────────────────────
+function openDetail(sid) {
+  detailSid = sid;
+  const data = students[sid]; if (!data) return;
+  refreshDetail(data);
+  document.getElementById('detail-overlay').classList.add('open');
+}
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  detailSid = null;
+}
+function refreshDetail(data) {
+  document.getElementById('dp-name').textContent   = data.name;
+  const img = document.getElementById('dp-img');
+  if (data.thumb || data.last_frame) img.src = data.thumb || data.last_frame;
+  document.getElementById('dp-att').textContent    = data.attention.toFixed(1)+'%';
+  document.getElementById('dp-att').style.color    = scoreColor(data.attention);
+  document.getElementById('dp-sus').textContent    = data.suspicion.toFixed(1)+'%';
+  document.getElementById('dp-sus').style.color    = susColor(data.suspicion);
+  document.getElementById('dp-flags').textContent  = data.flags+' flag'+(data.flags===1?'':'s');
+  document.getElementById('dp-status').textContent = data.locked?'🔒 Locked':data.paused?'⏸ Paused':'✅ Active';
+  document.getElementById('dp-lock-reason').textContent = data.lock_reason || '—';
+
+  const idRow = document.getElementById('dp-id-row');
+  if (FACE_VERIFY && idRow) {
+    idRow.style.display = '';
+    const idEl = document.getElementById('dp-id');
+    if (data.id_score !== null && data.id_score !== undefined) {
+      const pct = Math.round(data.id_score*100);
+      idEl.textContent  = pct+'%';
+      idEl.style.color  = data.id_score>=0.72?'var(--green)':'#a78bfa';
+    } else {
+      idEl.textContent = 'Pending';
+      idEl.style.color = 'var(--text3)';
+    }
+  }
+
+  document.getElementById('dp-btn-lock').onclick   = () => { closeDetail(); lockStudent(data.session_id); };
+  document.getElementById('dp-btn-unlock').onclick = () => { unlockStudent(data.session_id); refreshDetail(students[data.session_id]||data); };
+}
+
+// ── Lock / unlock ─────────────────────────────────────────────────────────────
+function lockStudent(sid) {
+  lockTarget = sid;
+  document.getElementById('lock-reason').value = '';
+  document.getElementById('lock-modal').classList.add('open');
+}
+function closeLock() {
+  document.getElementById('lock-modal').classList.remove('open');
+  lockTarget = null;
+}
+function confirmLock() {
+  const reason = document.getElementById('lock-reason').value.trim() || 'Locked by teacher';
+  socket.emit('admin_lock_session', {session_id: lockTarget, reason});
+  closeLock(); toast('🔒 Session locked');
+}
+function unlockStudent(sid) {
+  socket.emit('admin_unlock_session', {session_id: sid});
+  toast('🔓 Session unlocked');
+}
+function lockAll() {
+  if (!confirm('Lock ALL active sessions in this exam?')) return;
+  socket.emit('admin_lock_exam', {exam_id: EXAM_ID, reason: 'All sessions locked by teacher'});
+  toast('🔒 All sessions locked');
+}
+function unlockAll() {
+  socket.emit('admin_unlock_exam', {exam_id: EXAM_ID});
+  toast('🔓 All sessions unlocked');
+}
+
+function scoreColor(v){return v>60?'var(--green)':v>35?'var(--amber)':'var(--red)';}
+function susColor(v) {return v<40?'var(--green)':v<70?'var(--amber)':'var(--red)';}
+</script>
+{% endblock %}

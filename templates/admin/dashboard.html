@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — ProctorVault{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Admin Panel</sub></div></div>
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <a class="nav-item active" href="/admin"><span class="icon">🏠</span>Dashboard</a>
+      <a class="nav-item" href="/admin/live"><span class="icon">📡</span>Live Monitor</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Management</div>
+      <a class="nav-item" href="/admin/users"><span class="icon">👥</span>Users</a>
+      <a class="nav-item" href="/admin/exams"><span class="icon">📋</span>Exams</a>
+      <a class="nav-item" href="/admin/sessions"><span class="icon">📁</span>Sessions</a>
+      <a class="nav-item" href="/admin/logs"><span class="icon">🗒️</span>System Logs</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">Administrator</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div><h2>System Dashboard</h2><div class="breadcrumb">Admin Panel</div></div>
+      <a href="/admin/live" class="btn btn-primary btn-sm">📡 Live Monitor</a>
+    </div>
+
+    <div class="page-content">
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card s-blue">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value">{{ stats.users }}</div>
+          <div class="stat-sub">admins, teachers, students</div>
+        </div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Exams</div>
+          <div class="stat-value">{{ stats.exams }}</div>
+          <div class="stat-sub">{{ stats.active_exams }} active</div>
+        </div>
+        <div class="stat-card s-amber">
+          <div class="stat-label">Sessions</div>
+          <div class="stat-value">{{ stats.sessions }}</div>
+          <div class="stat-sub">all time</div>
+        </div>
+        <div class="stat-card s-red">
+          <div class="stat-label">Proctor Events</div>
+          <div class="stat-value">{{ stats.events }}</div>
+          <div class="stat-sub">violations logged</div>
+        </div>
+        <div class="stat-card s-blue">
+          <div class="stat-label">Active Now</div>
+          <div class="stat-value" style="color:var(--green)">{{ stats.active }}</div>
+          <div class="stat-sub">live students</div>
+        </div>
+        <div class="stat-card" style="border-color:rgba(167,139,250,.3);">
+          <div class="stat-label">Enrolled Students</div>
+          <div class="stat-value" style="color:#a78bfa">{{ stats.enrolled }}</div>
+          <div class="stat-sub">{{ stats.enrolled_with_photo }} with photo</div>
+        </div>
+      </div>
+
+      <!-- Two-column -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <!-- Live exams -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📡 Live Exams</div>
+              <div class="card-sub">Exams with active sessions right now</div>
+            </div>
+            <a href="/admin/live" class="btn btn-ghost btn-sm">View All</a>
+          </div>
+          {% if live_exams %}
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            {% for exam in live_exams %}
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--text0);">{{ exam.title|truncate(32) }}</div>
+                <div style="font-size:.7rem;color:var(--text3);">
+                  Code: <span style="font-family:var(--mono);color:var(--accent);">{{ exam.exam_code }}</span>
+                  {% if exam.face_verify_enabled %}· <span style="color:#a78bfa;">🪪 ID Verify</span>{% endif %}
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="badge badge-green"><span class="live-dot"></span>{{ exam.active_count }}</span>
+                <a href="/teacher/exam/{{ exam.id }}/monitor" class="btn btn-ghost btn-sm">👁</a>
+                <a href="/teacher/exam/{{ exam.id }}/roster"  class="btn btn-ghost btn-sm">👥</a>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:24px;color:var(--text3);font-size:.85rem;">No active exams</div>
+          {% endif %}
+        </div>
+
+        <!-- Recent events -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">🚨 Recent Violations</div></div>
+          </div>
+          {% if recent_events %}
+          <div style="display:flex;flex-direction:column;gap:5px;max-height:300px;overflow-y:auto;">
+            {% for ev in recent_events %}
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:7px 10px;
+                background:var(--bg3);border-radius:7px;
+                border-left:3px solid
+                {% if 'lock' in (ev.event_type or '') %}var(--red)
+                {% elif 'identity' in (ev.event_type or '') %}#a78bfa
+                {% elif 'eye' in (ev.event_type or '') or 'face' in (ev.event_type or '') %}var(--amber)
+                {% else %}var(--border2){% endif %};">
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:.78rem;font-weight:600;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  {{ ev.student_name }}</div>
+                <div style="font-size:.7rem;color:var(--text2);">{{ ev.event_type }}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:.68rem;color:var(--text3);">{{ ev.timestamp[11:19] }}</div>
+                {% if ev.snapshot %}
+                <a href="/snapshot/{{ ev.snapshot }}" target="_blank"
+                   style="font-size:.65rem;color:var(--accent);">📷</a>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:24px;color:var(--text3);font-size:.85rem;">No events yet</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

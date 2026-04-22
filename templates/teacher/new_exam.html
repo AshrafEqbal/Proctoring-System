@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}New Exam — ProctorVault{% endblock %}
+{% block head %}
+<style>
+.fv-section{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:4px;}
+.fv-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.fv-title{font-size:.88rem;font-weight:700;color:var(--text0);margin-bottom:3px;}
+.fv-sub{font-size:.75rem;color:var(--text3);}
+.toggle-wrap{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--text2);flex-shrink:0;}
+.toggle{position:relative;width:40px;height:22px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;border-radius:999px;background:var(--bg4);cursor:pointer;transition:background .2s;}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;top:3px;left:3px;border-radius:50%;background:var(--text3);transition:transform .2s,background .2s;}
+.toggle input:checked+.toggle-slider{background:#16a37a;}
+.toggle input:checked+.toggle-slider::before{transform:translateX(18px);background:#fff;}
+.fv-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fv-fields.hidden{display:none;}
+.thresh-note{font-size:.7rem;color:var(--text3);margin-top:3px;}
+</style>
+{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Teacher</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/teacher"><span class="icon">📋</span>My Exams</a>
+      <a class="nav-item active" href="/teacher/exam/new"><span class="icon">➕</span>New Exam</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">{{ user.role }}</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div><h2>Create New Exam</h2><div class="breadcrumb"><a href="/teacher">My Exams</a> → New Exam</div></div>
+    </div>
+    <div class="page-content" style="max-width:680px;">
+      <div class="card">
+        <form method="POST">
+
+          <!-- Basic info -->
+          <div class="form-group">
+            <label class="form-label">Exam Title <span style="color:var(--red)">*</span></label>
+            <input class="form-input" type="text" name="title" placeholder="e.g. Midterm Exam — CS101" required autofocus>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description / Instructions</label>
+            <textarea class="form-textarea" name="description" placeholder="Optional instructions shown to students before they start…"></textarea>
+          </div>
+
+          <!-- Duration + attempts -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Duration (minutes)</label>
+              <input class="form-input" type="number" name="duration" value="60" min="5" max="360">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Attempts</label>
+              <input class="form-input" type="number" name="max_attempts" value="1" min="1" max="5">
+            </div>
+          </div>
+
+          <!-- Schedule -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Start Date/Time <span style="color:var(--text3);font-weight:400;">(optional)</span></label>
+              <input class="form-input" type="datetime-local" name="starts_at">
+            </div>
+            <div class="form-group">
+              <label class="form-label">End Date/Time <span style="color:var(--text3);font-weight:400;">(optional)</span></label>
+              <input class="form-input" type="datetime-local" name="ends_at">
+            </div>
+          </div>
+
+          <!-- Status + shuffle -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Initial Status</label>
+              <select class="form-select" name="status">
+                <option value="draft">Draft — not accessible to students</option>
+                <option value="active">Active — open for students now</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:26px;">
+              <input type="checkbox" name="shuffle" id="shuffle-chk" style="width:16px;height:16px;" checked>
+              <label for="shuffle-chk" style="font-size:.85rem;color:var(--text1);cursor:pointer;">Shuffle question order</label>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div style="border-top:1px solid var(--border);margin:18px 0;"></div>
+
+          <!-- Face Verification section -->
+          <div class="form-group">
+            <label class="form-label">Proctoring Settings</label>
+            <div class="fv-section">
+              <div class="fv-header">
+                <div>
+                  <div class="fv-title">🪪 Face Identity Verification</div>
+                  <div class="fv-sub">When enabled, students must submit a photo ID before starting. The system continuously verifies their identity against this photo during the exam. Mismatches trigger warnings and eventual auto-lock.</div>
+                </div>
+                <div class="toggle-wrap">
+                  <span style="font-size:.8rem;color:var(--text2);">Enable</span>
+                  <label class="toggle">
+                    <input type="checkbox" name="face_verify" id="fv-toggle"
+                           onchange="document.getElementById('fv-fields').classList.toggle('hidden',!this.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="fv-fields hidden" id="fv-fields">
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label">Match Threshold</label>
+                  <input class="form-input" type="range" name="face_thresh" id="fv-thresh"
+                         min="0.5" max="0.95" step="0.01" value="0.72"
+                         oninput="updateThreshLabel(this.value)"
+                         style="padding:6px 0;">
+                  <div class="thresh-note" id="fv-thresh-label">72% — Balanced (recommended)</div>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label">Fails Before Lock</label>
+                  <input class="form-input" type="number" name="face_fail_limit" value="3" min="1" max="10">
+                  <div class="thresh-note">How many consecutive mismatches trigger auto-lock.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;">
+            <a href="/teacher" class="btn btn-ghost">Cancel</a>
+            <button class="btn btn-primary" type="submit">Create & Add Questions →</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateThreshLabel(v) {
+  const pct = Math.round(v * 100);
+  const label = pct >= 85 ? 'Strict (fewer false positives, may flag lighting changes)' :
+                pct >= 72 ? 'Balanced (recommended)' :
+                            'Lenient (more tolerant of appearance variation)';
+  document.getElementById('fv-thresh-label').textContent = `${pct}% — ${label}`;
+}
+</script>
+{% endblock %}

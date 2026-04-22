@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Live Monitor — Admin{% endblock %}
+{% block head %}
+<style>
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.stu-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
+.stu-card.locked{border-color:rgba(240,90,90,.5);}
+.stu-card.flagged{border-color:rgba(240,160,48,.3);}
+.sc-cam{position:relative;background:#060810;aspect-ratio:4/3;}
+.sc-cam img{width:100%;height:100%;object-fit:cover;opacity:.3;transition:opacity .3s;}
+.sc-cam img.loaded{opacity:1;}
+.sc-lock-ov{position:absolute;inset:0;background:rgba(190,30,30,.8);display:none;align-items:center;justify-content:center;flex-direction:column;gap:4px;}
+.stu-card.locked .sc-lock-ov{display:flex;}
+.sc-body{padding:11px;}
+.sc-name{font-size:.85rem;font-weight:700;color:var(--text0);}
+.sc-meta{font-size:.68rem;color:var(--text3);margin-bottom:7px;}
+.sc-bar-row{display:flex;align-items:center;gap:7px;font-size:.7rem;margin-bottom:5px;}
+.sc-bar-row .lbl{min-width:46px;color:var(--text2);}
+.sc-bar-t{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.sc-bar-f{height:100%;border-radius:2px;transition:width .5s,background .4s;}
+.sc-bar-v{min-width:28px;text-align:right;font-weight:600;}
+.sc-acts{display:flex;gap:5px;margin-top:8px;}
+.sc-acts button{flex:1;padding:5px;font-size:.7rem;}
+.exam-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.ef-btn{padding:5px 12px;border-radius:999px;font-size:.75rem;font-weight:600;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .15s;}
+.ef-btn.active,.ef-btn:hover{background:var(--bg4);color:var(--text0);border-color:var(--border2);}
+.ef-btn.all.active{background:rgba(79,142,247,.15);color:var(--accent);border-color:rgba(79,142,247,.4);}
+</style>
+{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Admin</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/admin"><span class="icon">🏠</span>Dashboard</a>
+      <a class="nav-item active" href="/admin/live"><span class="icon">📡</span>Live Monitor</a>
+      <a class="nav-item" href="/admin/users"><span class="icon">👥</span>Users</a>
+      <a class="nav-item" href="/admin/exams"><span class="icon">📋</span>Exams</a>
+      <a class="nav-item" href="/admin/sessions"><span class="icon">📁</span>Sessions</a>
+      <a class="nav-item" href="/admin/logs"><span class="icon">🗒️</span>Logs</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">Administrator</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+  <div class="main-area">
+    <div class="topbar">
+      <div><h2>Live Monitor</h2><div class="breadcrumb">All active sessions</div></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="badge badge-blue"><span class="live-dot"></span><span id="active-count">0</span> active</span>
+        <span class="badge badge-red" id="locked-badge" style="display:none;"><span id="locked-count">0</span> locked</span>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('Lock ALL?'))socket.emit('admin_broadcast_lock',{reason:'Admin locked all'})">🔒 Lock All</button>
+        <button class="btn btn-success btn-sm" onclick="socket.emit('admin_broadcast_unlock',{})">🔓 Unlock All</button>
+      </div>
+    </div>
+    <div class="page-content">
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card s-blue"><div class="stat-label">Active</div><div class="stat-value" id="st-active">0</div></div>
+        <div class="stat-card s-red"><div class="stat-label">Locked</div><div class="stat-value" id="st-locked" style="color:var(--red)">0</div></div>
+        <div class="stat-card s-amber"><div class="stat-label">Flagged</div><div class="stat-value" id="st-flags" style="color:var(--amber)">0</div></div>
+        <div class="stat-card s-green"><div class="stat-label">Avg Attention</div><div class="stat-value" id="st-att" style="color:var(--green)">—</div></div>
+      </div>
+      <!-- Exam filter -->
+      <div class="exam-filter" id="exam-filter">
+        <button class="ef-btn all active" data-exam="all" onclick="filterExam('all',this)">All Exams</button>
+        {% for exam in exams %}
+        <button class="ef-btn" data-exam="{{ exam.id }}" onclick="filterExam('{{ exam.id }}',this)">{{ exam.title }} <span style="font-family:var(--mono);font-size:.65em;color:var(--text3);">{{ exam.exam_code }}</span></button>
+        {% endfor %}
+      </div>
+      <div class="student-grid" id="student-grid">
+        <div id="empty-msg" style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text3);">
+          <div style="font-size:2.5rem;margin-bottom:12px;">📡</div><p>No active sessions</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="lock-modal">
+  <div class="modal">
+    <h3>🔒 Lock Session</h3>
+    <p>Reason for locking.</p>
+    <input class="form-input" type="text" id="lock-reason" placeholder="Reason…">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('lock-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmLock()">Lock</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const socket   = io();
+const students = {};
+let lockTarget = null;
+let filterExamId = 'all';
+
+socket.on('connect', () => socket.emit('join_admin_room'));
+socket.on('all_students', list => { list.forEach(addStudent); updateStats(); });
+socket.on('student_joined',  d => { addStudent(d); updateStats(); toast('✅ '+d.name+' joined'); });
+socket.on('student_left',    d => { removeStudent(d.session_id); updateStats(); });
+socket.on('student_update',  d => updateStudent(d));
+
+function addStudent(data) {
+  students[data.session_id] = data;
+  document.getElementById('empty-msg')?.remove();
+  const card = document.createElement('div');
+  card.id = 'sc-'+data.session_id;
+  card.className = 'stu-card'+(data.locked?' locked':'')+(data.flags>0?' flagged':'');
+  card.dataset.examId = data.exam_id;
+  card.style.display = (filterExamId==='all'||filterExamId===data.exam_id)?'':'none';
+  card.innerHTML = `
+    <div class="sc-cam">
+      <img id="scimg-${data.session_id}" src="" alt="" onload="this.classList.add('loaded')">
+      <div class="sc-lock-ov"><span style="font-size:2rem">🔒</span><span style="font-size:.72rem;color:#fca5a5;">LOCKED</span></div>
+    </div>
+    <div class="sc-body">
+      <div class="sc-name">${data.name}</div>
+      <div class="sc-meta">Exam: ${data.exam_id.slice(0,8)}… ${data.flags>0?'<span style="color:var(--amber)">⚠ '+data.flags+' flags</span>':''}</div>
+      <div class="sc-bar-row"><span class="lbl">Attn</span><div class="sc-bar-t"><div class="sc-bar-f" id="scatt-${data.session_id}" style="width:${data.attention}%;background:var(--green)"></div></div><span class="sc-bar-v" id="scattv-${data.session_id}" style="color:var(--green)">${data.attention.toFixed(0)}%</span></div>
+      <div class="sc-bar-row"><span class="lbl">Susp</span><div class="sc-bar-t"><div class="sc-bar-f" id="scsus-${data.session_id}" style="width:${data.suspicion}%;background:var(--green)"></div></div><span class="sc-bar-v" id="scsusv-${data.session_id}" style="color:var(--green)">${data.suspicion.toFixed(0)}%</span></div>
+      <div class="sc-acts">
+        <button class="btn btn-danger btn-sm" onclick="lockS('${data.session_id}')">🔒 Lock</button>
+        <button class="btn btn-success btn-sm" onclick="socket.emit('admin_unlock_session',{session_id:'${data.session_id}'});toast('🔓 Unlocked')">🔓</button>
+      </div>
+    </div>`;
+  document.getElementById('student-grid').appendChild(card);
+}
+
+function removeStudent(sid) {
+  delete students[sid];
+  document.getElementById('sc-'+sid)?.remove();
+  if (!Object.keys(students).length) {
+    const g = document.getElementById('student-grid');
+    g.innerHTML = '<div id="empty-msg" style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text3);"><div style="font-size:2.5rem;margin-bottom:12px;">📡</div><p>No active sessions</p></div>';
+  }
+}
+
+function updateStudent(data) {
+  students[data.session_id] = data;
+  const img = document.getElementById('scimg-'+data.session_id);
+  if (img && data.thumb) img.src = data.thumb;
+  const card = document.getElementById('sc-'+data.session_id);
+  if (card) { card.className='stu-card'+(data.locked?' locked':'')+(data.flags>0?' flagged':''); }
+  const ab = document.getElementById('scatt-'+data.session_id);
+  const sb = document.getElementById('scsus-'+data.session_id);
+  const av = document.getElementById('scattv-'+data.session_id);
+  const sv = document.getElementById('scsusv-'+data.session_id);
+  if (ab) { ab.style.width=data.attention+'%'; ab.style.background=scoreColor(data.attention); }
+  if (sb) { sb.style.width=data.suspicion+'%'; sb.style.background=susColor(data.suspicion); }
+  if (av) { av.textContent=data.attention.toFixed(0)+'%'; av.style.color=scoreColor(data.attention); }
+  if (sv) { sv.textContent=data.suspicion.toFixed(0)+'%'; sv.style.color=susColor(data.suspicion); }
+  updateStats();
+}
+
+function updateStats() {
+  const all = Object.values(students);
+  const locked = all.filter(s=>s.locked).length;
+  const flags  = all.filter(s=>s.flags>0).length;
+  const avgAtt = all.length ? all.reduce((s,u)=>s+u.attention,0)/all.length : 0;
+  document.getElementById('st-active').textContent = all.length;
+  document.getElementById('st-locked').textContent = locked;
+  document.getElementById('st-flags').textContent  = flags;
+  document.getElementById('st-att').textContent    = all.length ? avgAtt.toFixed(0)+'%':'—';
+  document.getElementById('active-count').textContent = all.length;
+  document.getElementById('locked-count').textContent = locked;
+  document.getElementById('locked-badge').style.display = locked>0?'':'none';
+}
+
+function filterExam(examId, btn) {
+  filterExamId = examId;
+  document.querySelectorAll('.ef-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.stu-card').forEach(c=>{
+    c.style.display = (examId==='all'||c.dataset.examId===examId)?'':'none';
+  });
+}
+
+function lockS(sid) { lockTarget=sid; document.getElementById('lock-reason').value=''; document.getElementById('lock-modal').classList.add('open'); }
+function confirmLock() {
+  socket.emit('admin_lock_session',{session_id:lockTarget,reason:document.getElementById('lock-reason').value||'Admin locked'});
+  document.getElementById('lock-modal').classList.remove('open');
+  toast('🔒 Locked');
+}
+function scoreColor(v){return v>60?'var(--green)':v>35?'var(--amber)':'var(--red)';}
+function susColor(v){return v<40?'var(--green)':v<70?'var(--amber)':'var(--red)';}
+</script>
+{% endblock %}

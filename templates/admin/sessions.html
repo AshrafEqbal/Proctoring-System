@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Sessions — Admin{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🛡️</div><div><span>ProctorVault</span><sub>Admin</sub></div></div>
+    <div class="nav-section">
+      <a class="nav-item" href="/admin"><span class="icon">🏠</span>Dashboard</a>
+      <a class="nav-item" href="/admin/live"><span class="icon">📡</span>Live Monitor</a>
+      <a class="nav-item" href="/admin/users"><span class="icon">👥</span>Users</a>
+      <a class="nav-item" href="/admin/exams"><span class="icon">📋</span>Exams</a>
+      <a class="nav-item active" href="/admin/sessions"><span class="icon">📁</span>Sessions</a>
+      <a class="nav-item" href="/admin/logs"><span class="icon">🗒️</span>Logs</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user"><div class="av">{{ user.name[:2].upper() }}</div><div class="info"><div class="name">{{ user.name }}</div><div class="role">Administrator</div></div></div>
+      <a href="/logout" style="display:block;margin-top:10px;font-size:.75rem;color:var(--text3);">Sign out →</a>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div>
+        <h2>All Sessions</h2>
+        <div class="breadcrumb">Past & present · {{ sessions|length }} records</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" type="search" id="search" placeholder="Search name / email / exam…"
+               style="width:220px;" oninput="doSearch(this.value)">
+        <select class="form-select" id="status-filter" onchange="doSearch(document.getElementById('search').value)"
+                style="width:130px;">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="submitted">Submitted</option>
+          <option value="locked">Locked</option>
+          <option value="id_pending">ID Pending</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- Quick stats strip -->
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card s-blue"><div class="stat-label">Total</div><div class="stat-value">{{ sessions|length }}</div></div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Submitted</div>
+          <div class="stat-value" style="color:var(--green)">{{ sessions|selectattr('submitted_at')|list|length }}</div>
+        </div>
+        <div class="stat-card s-red">
+          <div class="stat-label">Locked</div>
+          <div class="stat-value" style="color:var(--red)">{{ sessions|selectattr('locked')|list|length }}</div>
+        </div>
+        <div class="stat-card s-amber">
+          <div class="stat-label">Flagged</div>
+          <div class="stat-value" style="color:var(--amber)">{{ sessions|selectattr('flags','gt',0)|list|length }}</div>
+        </div>
+        <div class="stat-card" style="border-color:rgba(167,139,250,.3);">
+          <div class="stat-label">ID Fails</div>
+          <div class="stat-value" style="color:#a78bfa">{{ sessions|selectattr('id_fail_count')|selectattr('id_fail_count','gt',0)|list|length }}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th><th>Email</th><th>Exam</th>
+                <th>Score</th><th>Attn</th><th>Flags</th>
+                <th>ID Fails</th><th>Status</th><th>Locked</th><th>Started</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-tbody">
+              {% for s in sessions %}
+              <tr data-search="{{ (s.student_name+' '+s.student_email+' '+s.exam_title)|lower }}"
+                  data-status="{{ s.status }}">
+                <td style="font-weight:600;color:var(--text0);">{{ s.student_name }}</td>
+                <td style="font-size:.72rem;color:var(--text3);">{{ s.student_email }}</td>
+                <td style="font-size:.75rem;color:var(--text2);">{{ s.exam_title|truncate(28) }}</td>
+                <td>
+                  {% if s.score is not none and s.max_score %}
+                    {% set p=(s.score/s.max_score*100)|int %}
+                    <span style="font-weight:700;color:{% if p>=70 %}var(--green){% elif p>=50 %}var(--amber){% else %}var(--red){% endif %}">{{ p }}%</span>
+                  {% else %}<span style="color:var(--text3);">—</span>{% endif %}
+                </td>
+                <td>
+                  <span style="font-size:.8rem;color:{% if s.attention_avg>60 %}var(--green){% elif s.attention_avg>35 %}var(--amber){% else %}var(--red){% endif %}">
+                    {{ "%.0f"|format(s.attention_avg) }}%</span>
+                </td>
+                <td>
+                  {% if s.flags>0 %}<span class="badge badge-red" style="font-size:.68rem;">{{ s.flags }}</span>
+                  {% else %}<span style="color:var(--text3);">0</span>{% endif %}
+                </td>
+                <td>
+                  {% if s.id_fail_count and s.id_fail_count>0 %}
+                    <span class="badge" style="background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3);font-size:.68rem;">
+                      {{ s.id_fail_count }}×</span>
+                  {% else %}<span style="color:var(--text3);">—</span>{% endif %}
+                </td>
+                <td>
+                  {% if s.status=='submitted' %}<span class="badge badge-green">Submitted</span>
+                  {% elif s.status=='locked' %}<span class="badge badge-red">Locked</span>
+                  {% elif s.status=='active' %}<span class="badge badge-blue"><span class="live-dot"></span>Active</span>
+                  {% elif s.status=='id_pending' %}<span class="badge" style="background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);">ID Pending</span>
+                  {% else %}<span class="badge badge-gray">{{ s.status }}</span>{% endif %}
+                </td>
+                <td>
+                  {% if s.locked %}<span class="badge badge-red" style="font-size:.65rem;">🔒</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td style="font-size:.7rem;color:var(--text3);white-space:nowrap;">
+                  {{ (s.started_at or '')[:16].replace('T',' ') }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function doSearch(v) {
+  v = v.toLowerCase();
+  const sf = document.getElementById('status-filter').value;
+  document.querySelectorAll('#sessions-tbody tr').forEach(tr => {
+    const matchSearch = !v || tr.dataset.search.includes(v);
+    const matchStatus = !sf  || tr.dataset.status === sf;
+    tr.style.display  = (matchSearch && matchStatus) ? '' : 'none';
+  });
+}
+document.getElementById('status-filter').addEventListener('change', () =>
+  doSearch(document.getElementById('search').value));
+</script>
+{% endblock %}
